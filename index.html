@@ -4,628 +4,367 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ascolta RE — Reggio Emilia ti sente</title>
-<meta name="description" content="Ascolto anonimo per la comunità di Reggio Emilia. Solo persone reali. Nessun giudizio.">
+<meta name="description" content="Ascolto anonimo e gratuito per la comunità di Reggio Emilia. Solo persone reali. Nessun giudizio, nessun nome.">
+<meta property="og:title" content="ascolta RE — Reggio Emilia ti sente">
+<meta property="og:description" content="Una piattaforma anonima di ascolto per la comunità reggiana. Solo cuore e persone reali. Nessun algoritmo.">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="it_IT">
+<meta name="theme-color" content="#090806">
 <script src="/socket.io/socket.io.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0A0908;
-  --bg2:#111009;
-  --bg3:#181510;
-  --bg4:#201C15;
-  --cream:#F5EFE4;
-  --cream2:#C9BBA4;
-  --muted:#6E6455;
-  --muted2:#4A4238;
-  --gold:#C8A84C;
-  --gold2:#E2C870;
-  --gold3:#8A6C2A;
-  --gold4:rgba(200,168,76,0.08);
-  --danger:#9B2020;
-  --success:#3D8B5E;
-  --r:14px;
-  --rl:20px;
+  --bg:#090806;--bg2:#100F0C;--bg3:#161410;--bg4:#1E1B14;
+  --cream:#F5EFE3;--cream2:#C6B89E;--muted:#6A5E4E;--muted2:#3E3630;
+  --gold:#C5A44A;--gold2:#DFC06A;--gold3:#856A28;--golda:rgba(197,164,74,0.08);
+  --danger:#8B1C1C;--success:#3A7D54;--r:14px;--rl:18px;
 }
 html{scroll-behavior:smooth}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--cream);min-height:100vh;overflow-x:hidden}
 
-/* ══ LOADER ══ */
-#loader{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;transition:opacity 1s ease}
+#loader{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;transition:opacity 1.2s ease}
 #loader.out{opacity:0;pointer-events:none}
-.l-ornament{font-size:11px;letter-spacing:8px;text-transform:uppercase;color:var(--gold3);opacity:0;animation:lUp 1s .1s ease forwards;margin-bottom:20px;display:flex;align-items:center;gap:16px}
-.l-ornament::before,.l-ornament::after{content:'';display:block;width:24px;height:.5px;background:var(--gold3)}
-.l-logo{font-family:'Cormorant Garamond',serif;font-size:clamp(60px,12vw,110px);font-weight:300;letter-spacing:-4px;line-height:.9;color:var(--cream);opacity:0;animation:lUp 1.1s .4s ease forwards;text-align:center}
+.l-pre{font-size:9px;letter-spacing:8px;text-transform:uppercase;color:var(--gold3);opacity:0;animation:lUp 1s .1s ease forwards;margin-bottom:18px;display:flex;align-items:center;gap:14px}
+.l-pre::before,.l-pre::after{content:'';display:block;width:20px;height:.5px;background:var(--gold3)}
+.l-logo{font-family:'Cormorant Garamond',serif;font-size:clamp(64px,13vw,118px);font-weight:300;letter-spacing:-4px;line-height:.88;color:var(--cream);opacity:0;animation:lUp 1.1s .4s ease forwards;text-align:center}
 .l-logo span{color:var(--gold);font-style:italic}
-.l-sub{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--muted);margin-top:24px;opacity:0;animation:lUp 1s .9s ease forwards}
-.l-line{width:.5px;height:0;background:linear-gradient(to bottom,var(--gold),transparent);margin-top:36px;animation:lLine 1.4s 1.2s ease forwards}
-@keyframes lLine{to{height:80px}}
-@keyframes lUp{to{opacity:1;transform:translateY(0)}from{opacity:0;transform:translateY(14px)}}
+.l-sub{font-size:10px;letter-spacing:5px;text-transform:uppercase;color:var(--muted);margin-top:26px;opacity:0;animation:lUp 1s .9s ease forwards}
+.l-vline{width:.5px;height:0;background:linear-gradient(to bottom,var(--gold3),transparent);margin-top:36px;animation:lV 1.5s 1.2s ease forwards}
+@keyframes lV{to{height:90px}}
+@keyframes lUp{to{opacity:1;transform:none}from{opacity:0;transform:translateY(12px)}}
 
-/* ══ SCREENS ══ */
 .screen{display:none}
 #home.active{display:block}
 #chat-screen.active{display:flex;flex-direction:column;height:100vh;max-width:760px;margin:0 auto;padding:0 32px}
 #eco-screen.active{display:flex;flex-direction:column;height:100vh}
 #disc-screen.active{display:block;min-height:100vh}
 
-/* ══ NAV ══ */
-nav{
-  padding:20px 52px;
-  display:flex;align-items:center;justify-content:space-between;
-  border-bottom:.5px solid rgba(200,168,76,.12);
-  position:sticky;top:0;
-  background:rgba(10,9,8,.95);
-  backdrop-filter:blur(24px);
-  z-index:100;
-}
-.nav-brand{display:flex;align-items:baseline;gap:10px;cursor:pointer;text-decoration:none}
-.nav-logo-txt{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;letter-spacing:-.5px;color:var(--cream)}
-.nav-re{
-  font-family:'DM Sans',sans-serif;font-size:9px;font-weight:500;
-  letter-spacing:3px;text-transform:uppercase;color:var(--gold);
-  border:.5px solid rgba(200,168,76,.35);padding:3px 8px;border-radius:3px;
-}
-.nav-center{display:flex;align-items:center;gap:6px}
+nav{padding:18px 52px;display:flex;align-items:center;justify-content:space-between;border-bottom:.5px solid rgba(197,164,74,.1);position:sticky;top:0;background:rgba(9,8,6,.96);backdrop-filter:blur(28px);z-index:200}
+.nav-brand{display:flex;align-items:baseline;gap:10px;cursor:pointer}
+.nav-logo-t{font-family:'Cormorant Garamond',serif;font-size:21px;font-weight:400;letter-spacing:-.5px;color:var(--cream)}
+.nav-re{font-size:8px;font-weight:500;letter-spacing:3px;text-transform:uppercase;color:var(--gold);border:.5px solid rgba(197,164,74,.3);padding:3px 7px;border-radius:2px}
+.nav-mid{display:flex;align-items:center;gap:14px}
 .nav-status{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:6px}
 .dot{width:4px;height:4px;border-radius:50%;background:var(--muted);transition:all .3s;flex-shrink:0}
-.dot.on{background:var(--success);box-shadow:0 0 8px rgba(61,139,94,.6);animation:pulse 3s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.btn-nav{
-  font-family:'DM Sans',sans-serif;font-size:10px;font-weight:400;
-  letter-spacing:2px;text-transform:uppercase;
-  color:var(--cream2);background:none;
-  border:.5px solid rgba(200,168,76,.2);
-  padding:7px 16px;border-radius:3px;cursor:pointer;
-  transition:all .2s;white-space:nowrap;
-}
-.btn-nav:hover{background:var(--gold4);border-color:rgba(200,168,76,.5);color:var(--gold2)}
+.dot.on{background:var(--success);box-shadow:0 0 8px rgba(58,125,84,.7);animation:blink 3s infinite}
+.nav-online{font-size:10px;letter-spacing:1px;color:var(--muted2);display:flex;align-items:center;gap:5px}
+.online-num{color:var(--gold3);font-weight:500}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.nav-right{display:flex;gap:6px}
+.btn-nav{font-family:'DM Sans',sans-serif;font-size:9px;font-weight:400;letter-spacing:2px;text-transform:uppercase;color:var(--cream2);background:none;border:.5px solid rgba(197,164,74,.18);padding:7px 15px;border-radius:2px;cursor:pointer;transition:all .2s;white-space:nowrap}
+.btn-nav:hover{background:var(--golda);border-color:rgba(197,164,74,.5);color:var(--gold2)}
 
-/* ══ HUMAN CERT ══ */
-.cert-bar{
-  padding:11px 52px;
-  background:linear-gradient(to right,transparent,rgba(200,168,76,.04),transparent);
-  border-bottom:.5px solid rgba(200,168,76,.08);
-  display:flex;align-items:center;justify-content:center;gap:14px;
-}
-.cert-line{flex:1;height:.5px;background:linear-gradient(to right,transparent,rgba(200,168,76,.15))}
-.cert-line.r{background:linear-gradient(to left,transparent,rgba(200,168,76,.15))}
-.cert-inner{display:flex;align-items:center;gap:10px}
-.cert-txt{font-size:11px;color:var(--muted);letter-spacing:.5px}
+.cert-bar{padding:10px 52px;background:linear-gradient(to right,transparent,rgba(197,164,74,.03),transparent);border-bottom:.5px solid rgba(197,164,74,.06);display:flex;align-items:center;justify-content:center;gap:16px}
+.cert-line{flex:1;height:.5px;background:linear-gradient(to right,transparent,rgba(197,164,74,.1))}
+.cert-line.r{background:linear-gradient(to left,transparent,rgba(197,164,74,.1))}
+.cert-mid{display:flex;align-items:center;gap:10px}
+.cert-txt{font-size:11px;color:var(--muted)}
 .cert-txt strong{color:var(--cream2);font-weight:500}
-.cert-badge{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--gold3);background:var(--gold4);border:.5px solid rgba(200,168,76,.18);padding:3px 10px;border-radius:2px}
+.cert-badge{font-size:8px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold3);background:var(--golda);border:.5px solid rgba(197,164,74,.15);padding:3px 9px;border-radius:2px}
 
-/* ══ DISC BANNER ══ */
-.disc-banner{
-  padding:11px 52px;
-  background:rgba(155,32,32,.08);
-  border-bottom:.5px solid rgba(155,32,32,.2);
-  display:flex;align-items:center;gap:12px;
-}
-.disc-banner p{font-size:11px;color:rgba(245,239,228,.45);line-height:1.6}
-.disc-banner strong{color:rgba(245,239,228,.75);font-weight:500}
-.disc-banner a{color:var(--gold);text-decoration:none;font-size:11px}
-.disc-banner a:hover{text-decoration:underline}
+.warn-bar{padding:10px 52px;background:rgba(139,28,28,.07);border-bottom:.5px solid rgba(139,28,28,.16);display:flex;align-items:center;gap:12px}
+.warn-bar p{font-size:11px;color:rgba(245,239,227,.4);line-height:1.6}
+.warn-bar strong{color:rgba(245,239,227,.72);font-weight:500}
+.warn-bar a{color:var(--gold);text-decoration:none;font-size:11px}
 
-/* ══ BATTITO ══ */
-.battito{
-  padding:16px 52px;
-  background:var(--bg2);
-  border-bottom:.5px solid rgba(200,168,76,.08);
-  display:flex;align-items:center;justify-content:center;gap:40px;flex-wrap:wrap;
-}
+.battito{padding:14px 52px;background:var(--bg2);border-bottom:.5px solid rgba(197,164,74,.07);display:flex;align-items:center;justify-content:center;gap:36px;flex-wrap:wrap}
 .b-item{display:flex;flex-direction:column;align-items:center;gap:3px}
-.b-num{
-  font-family:'Cormorant Garamond',serif;
-  font-size:32px;font-weight:600;color:var(--gold);line-height:1;
-  transition:all .5s ease;
-}
-.b-num.bump{transform:scale(1.2);color:var(--gold2)}
+.b-num{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:600;color:var(--gold);line-height:1;transition:all .5s}
+.b-num.bump{transform:scale(1.22);color:var(--gold2)}
 .b-lbl{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted)}
-.b-sep{width:.5px;height:32px;background:rgba(200,168,76,.12)}
+.b-sep{width:.5px;height:28px;background:rgba(197,164,74,.1)}
 .b-date{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted2)}
 
-/* ══ HERO ══ */
-.hero{
-  min-height:90vh;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:80px 52px 60px;text-align:center;
-  position:relative;overflow:hidden;
-}
-.hero-watermark{
-  position:absolute;
-  font-family:'Cormorant Garamond',serif;
-  font-size:min(30vw,340px);font-weight:300;font-style:italic;
-  color:rgba(200,168,76,.025);letter-spacing:-12px;
-  pointer-events:none;user-select:none;white-space:nowrap;
-  top:50%;left:50%;transform:translate(-50%,-50%);
-}
-.hero-eyebrow{
-  font-size:10px;letter-spacing:5px;text-transform:uppercase;color:var(--gold3);
-  margin-bottom:32px;display:flex;align-items:center;gap:16px;
-}
-.hero-eyebrow::before,.hero-eyebrow::after{content:'';display:block;width:28px;height:.5px;background:var(--gold3)}
-.hero-title{
-  font-family:'Cormorant Garamond',serif;
-  font-size:clamp(44px,8vw,96px);
-  font-weight:300;line-height:1;letter-spacing:-3px;
-  color:var(--cream);max-width:900px;margin-bottom:28px;
-}
+/* HERO */
+.hero{min-height:92vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 52px 64px;text-align:center;position:relative;overflow:hidden}
+.hero-wm{position:absolute;font-family:'Cormorant Garamond',serif;font-size:min(32vw,380px);font-weight:300;font-style:italic;color:rgba(197,164,74,.022);letter-spacing:-14px;pointer-events:none;user-select:none;white-space:nowrap;top:50%;left:50%;transform:translate(-50%,-50%)}
+.hero-time-msg{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--gold3);margin-bottom:12px;opacity:.7}
+.hero-ey{font-size:10px;letter-spacing:5px;text-transform:uppercase;color:var(--gold3);margin-bottom:30px;display:flex;align-items:center;gap:16px}
+.hero-ey::before,.hero-ey::after{content:'';display:block;width:24px;height:.5px;background:var(--gold3)}
+.hero-title{font-family:'Cormorant Garamond',serif;font-size:clamp(44px,8.5vw,100px);font-weight:300;line-height:.96;letter-spacing:-3px;color:var(--cream);max-width:920px;margin-bottom:28px}
 .hero-title em{font-style:italic;color:var(--gold2)}
-.hero-title strong{font-weight:600;color:var(--cream)}
-.hero-sub{
-  font-size:16px;color:var(--cream2);max-width:440px;
-  line-height:1.85;font-weight:300;margin-bottom:56px;
-}
-.hero-scroll{
-  position:absolute;bottom:36px;left:50%;transform:translateX(-50%);
-  display:flex;flex-direction:column;align-items:center;gap:10px;
-  font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--muted2);
-}
-.scroll-vline{width:.5px;height:48px;background:linear-gradient(to bottom,var(--muted2),transparent)}
+.hero-title strong{font-weight:600}
+.hero-body{font-size:16px;color:var(--cream2);max-width:440px;line-height:1.9;font-weight:300;margin-bottom:56px}
+.hero-scroll{position:absolute;bottom:32px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--muted2)}
+.scroll-vl{width:.5px;height:44px;background:linear-gradient(to bottom,var(--muted2),transparent)}
 
-/* ══ SIGNAL BOX ══ */
-.sig-outer{
-  position:relative;max-width:620px;width:100%;
-}
-.sig-outer::before{
-  content:'';position:absolute;inset:-1px;
-  background:linear-gradient(135deg,rgba(200,168,76,.5),rgba(200,168,76,.02),rgba(200,168,76,.25),rgba(200,168,76,.02));
-  border-radius:calc(var(--rl)+1px);pointer-events:none;
-}
-.sig-inner{
-  background:var(--bg2);border-radius:var(--rl);
-  padding:36px 40px;position:relative;
-}
-.sig-header{
-  display:flex;align-items:center;gap:10px;
-  margin-bottom:18px;
-}
-.sig-dot{width:5px;height:5px;background:var(--gold);border-radius:50%;animation:pulse 2s infinite}
-.sig-lbl{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--gold)}
-.sig-ta{
-  width:100%;
-  background:rgba(255,255,255,.03);
-  border:.5px solid rgba(200,168,76,.18);
-  border-radius:10px;padding:18px 20px;
-  color:var(--cream);font-family:'DM Sans',sans-serif;
-  font-size:15px;font-weight:300;resize:none;outline:none;
-  min-height:110px;line-height:1.75;
-  transition:border-color .3s,background .3s;
-}
-.sig-ta::placeholder{color:rgba(245,239,228,.18)}
-.sig-ta:focus{border-color:rgba(200,168,76,.55);background:rgba(255,255,255,.05)}
-.sig-footer{display:flex;align-items:center;justify-content:space-between;margin-top:18px;gap:12px;flex-wrap:wrap}
+/* SIGNAL BOX */
+.sig-outer{position:relative;max-width:620px;width:100%}
+.sig-outer::before{content:'';position:absolute;inset:-1px;background:linear-gradient(135deg,rgba(197,164,74,.55),rgba(197,164,74,.02),rgba(197,164,74,.3),rgba(197,164,74,.02));border-radius:calc(var(--rl)+1px);pointer-events:none}
+.sig-inner{background:var(--bg2);border-radius:var(--rl);padding:36px 40px;position:relative}
+.sig-hdr{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.sig-dot{width:5px;height:5px;background:var(--gold);border-radius:50%;animation:blink 2s infinite}
+.sig-lbl{font-size:9px;letter-spacing:3.5px;text-transform:uppercase;color:var(--gold)}
+.sig-ta{width:100%;background:rgba(255,255,255,.03);border:.5px solid rgba(197,164,74,.16);border-radius:10px;padding:18px 20px;color:var(--cream);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:300;resize:none;outline:none;min-height:108px;line-height:1.8;transition:border-color .3s,background .3s}
+.sig-ta::placeholder{color:rgba(245,239,227,.16)}
+.sig-ta:focus{border-color:rgba(197,164,74,.5);background:rgba(255,255,255,.045)}
+.sig-foot{display:flex;align-items:center;justify-content:space-between;margin-top:18px;gap:12px;flex-wrap:wrap}
 .sig-anon{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:7px}
-.btn-primary{
-  background:var(--gold);color:var(--bg);
-  border:none;padding:14px 32px;border-radius:40px;
-  font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;
-  cursor:pointer;letter-spacing:1.5px;text-transform:uppercase;
-  transition:opacity .2s,transform .15s,box-shadow .2s;white-space:nowrap;
-}
-.btn-primary:hover{opacity:.88;transform:scale(.98);box-shadow:0 6px 24px rgba(200,168,76,.25)}
-.btn-primary:disabled{opacity:.28;cursor:not-allowed;transform:none;box-shadow:none}
+.btn-primary{background:var(--gold);color:var(--bg);border:none;padding:14px 32px;border-radius:40px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;cursor:pointer;letter-spacing:1.5px;text-transform:uppercase;transition:opacity .2s,transform .15s,box-shadow .2s;white-space:nowrap}
+.btn-primary:hover{opacity:.88;transform:scale(.98);box-shadow:0 6px 28px rgba(197,164,74,.25)}
+.btn-primary:disabled{opacity:.26;cursor:not-allowed;transform:none;box-shadow:none}
+.spam-msg{display:none;font-size:11px;color:var(--gold3);margin-top:10px;text-align:center;letter-spacing:.5px}
 
-/* ══ SECTION DIVIDER ══ */
-.s-divider{
-  display:flex;align-items:center;gap:20px;
-  padding:56px 52px 36px;max-width:1000px;margin:0 auto;width:100%;
-}
-.s-div-line{flex:1;height:.5px;background:rgba(200,168,76,.1)}
+/* DIVIDER */
+.s-div{display:flex;align-items:center;gap:20px;padding:52px 52px 32px;max-width:1000px;margin:0 auto;width:100%}
+.s-div-line{flex:1;height:.5px;background:rgba(197,164,74,.09)}
 .s-div-txt{font-size:9px;letter-spacing:4px;text-transform:uppercase;color:var(--muted2);white-space:nowrap}
 
-/* ══ FEED ══ */
+/* FEED */
 .feed-wrap{padding:0 52px 80px}
-.feed-top{display:flex;align-items:center;justify-content:space-between;max-width:1000px;margin:0 auto 20px}
+.feed-top{display:flex;align-items:center;justify-content:space-between;max-width:1000px;margin:0 auto 18px}
 .feed-lbl{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--muted)}
-.feed-ct{font-size:10px;letter-spacing:1px;background:var(--gold4);color:var(--gold);border:.5px solid rgba(200,168,76,.2);padding:4px 12px;border-radius:20px}
+.feed-ct{font-size:10px;letter-spacing:1px;background:var(--golda);color:var(--gold);border:.5px solid rgba(197,164,74,.18);padding:4px 12px;border-radius:20px}
 .feed-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;max-width:1000px;margin:0 auto}
-.card{
-  background:var(--bg2);border:.5px solid rgba(200,168,76,.09);
-  border-radius:var(--rl);padding:26px;cursor:pointer;
-  transition:transform .3s,border-color .3s,box-shadow .3s,opacity .4s;
-  position:relative;overflow:hidden;animation:cIn .4s ease both;
-}
+
+.card{background:var(--bg2);border:.5px solid rgba(197,164,74,.08);border-radius:var(--rl);padding:26px;cursor:pointer;transition:transform .3s,border-color .3s,box-shadow .3s,opacity .4s;position:relative;overflow:hidden;animation:cIn .4s ease both}
 .card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(to right,transparent,var(--gold),transparent);opacity:0;transition:opacity .3s}
-.card.removing{opacity:0;transform:scale(.94) translateY(-8px);pointer-events:none}
-.card:hover{transform:translateY(-5px);border-color:rgba(200,168,76,.28);box-shadow:0 16px 48px rgba(0,0,0,.5)}
-.card:hover::before{opacity:.6}
+.card.removing{opacity:0;transform:scale(.93) translateY(-10px);pointer-events:none}
+.card.veglia{border-color:rgba(197,164,74,.22);animation:cIn .4s ease both,vegliaPulse 4s ease infinite}
+.card:hover{transform:translateY(-5px);border-color:rgba(197,164,74,.3);box-shadow:0 18px 52px rgba(0,0,0,.55)}
+.card:hover::before{opacity:.55}
 @keyframes cIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes vegliaPulse{0%,100%{box-shadow:0 0 0 0 rgba(197,164,74,0)}50%{box-shadow:0 0 20px 2px rgba(197,164,74,.12)}}
+
 .card-meta{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .card-time{font-size:10px;letter-spacing:1px;color:var(--muted2)}
 .card-tags{display:flex;gap:6px;align-items:center}
-.card-ttl{font-size:9px;letter-spacing:.5px;color:var(--gold3)}
-.card-re{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--gold3);background:var(--gold4);border:.5px solid rgba(200,168,76,.12);padding:2px 7px;border-radius:2px}
-.card-txt{font-size:14px;line-height:1.75;color:var(--cream2);font-weight:300;margin-bottom:22px}
-.card-foot{display:flex;justify-content:space-between;align-items:center;padding-top:16px;border-top:.5px solid rgba(255,255,255,.04)}
+.card-ttl{font-size:9px;color:var(--gold3)}
+.card-re{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--gold3);background:var(--golda);border:.5px solid rgba(197,164,74,.1);padding:2px 7px;border-radius:2px}
+.card-veglia-badge{font-size:8px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold2);background:rgba(197,164,74,.1);border:.5px solid rgba(197,164,74,.25);padding:2px 8px;border-radius:10px;animation:blink 3s infinite}
+.card-txt{font-size:14px;line-height:1.78;color:var(--cream2);font-weight:300;margin-bottom:22px}
+.card-foot{display:flex;justify-content:space-between;align-items:center;padding-top:14px;border-top:.5px solid rgba(255,255,255,.04)}
 .card-anon{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2)}
-.btn-listen{
-  font-size:10px;letter-spacing:2px;text-transform:uppercase;
-  color:var(--gold);background:none;
-  border:.5px solid rgba(200,168,76,.28);
-  padding:8px 20px;border-radius:30px;
-  font-family:'DM Sans',sans-serif;cursor:pointer;
-  transition:all .2s;
-}
-.btn-listen:hover{background:var(--gold4);border-color:var(--gold)}
-.feed-vuoto{text-align:center;color:var(--muted);grid-column:1/-1;padding:60px 20px;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:22px;line-height:1.6}
+.btn-listen{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);background:none;border:.5px solid rgba(197,164,74,.25);padding:8px 20px;border-radius:30px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s}
+.btn-listen:hover{background:var(--golda);border-color:var(--gold)}
+.feed-empty{text-align:center;color:var(--muted);grid-column:1/-1;padding:60px 20px;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:22px;line-height:1.7}
 
-/* ══ EMERGENCY ══ */
-.emerg{padding:52px;background:var(--bg2);border-top:.5px solid rgba(200,168,76,.08)}
+/* EMERGENCY */
+.emerg{padding:52px;background:var(--bg2);border-top:.5px solid rgba(197,164,74,.07)}
 .emerg-in{max-width:1000px;margin:0 auto}
-.emerg-hdr{font-size:9px;letter-spacing:4px;text-transform:uppercase;color:var(--gold3);margin-bottom:24px;display:flex;align-items:center;gap:14px}
-.emerg-hdr::after{content:'';flex:1;height:.5px;background:rgba(200,168,76,.12)}
-.emerg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
-.ecard{background:var(--bg3);border:.5px solid rgba(255,255,255,.05);border-radius:12px;padding:18px 20px}
+.emerg-hdr{font-size:9px;letter-spacing:4px;text-transform:uppercase;color:var(--gold3);margin-bottom:22px;display:flex;align-items:center;gap:14px}
+.emerg-hdr::after{content:'';flex:1;height:.5px;background:rgba(197,164,74,.1)}
+.emerg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:10px}
+.ecard{background:var(--bg3);border:.5px solid rgba(255,255,255,.04);border-radius:12px;padding:18px 20px}
 .ecard-name{font-size:12px;font-weight:500;color:var(--cream);margin-bottom:3px}
 .ecard-desc{font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5}
-.ecard-num{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--gold);letter-spacing:1px}
+.ecard-num{font-family:'Cormorant Garamond',serif;font-size:21px;font-weight:600;color:var(--gold);letter-spacing:1px}
 .ecard-note{font-size:9px;color:var(--success);letter-spacing:1px;margin-top:2px;text-transform:uppercase}
 
-/* ══ FOOTER ══ */
-.site-footer{
-  padding:36px 52px;border-top:.5px solid rgba(200,168,76,.07);
-  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;
-}
-.footer-logo{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:300;color:var(--muted2)}
-.footer-txt{font-size:11px;color:var(--muted2);text-align:center;line-height:1.8}
-.footer-city{font-size:10px;color:var(--gold3);letter-spacing:3px;text-transform:uppercase}
+/* FOOTER */
+.site-footer{padding:32px 52px;border-top:.5px solid rgba(197,164,74,.06);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px}
+.footer-logo{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:300;color:var(--muted2)}
+.footer-txt{font-size:11px;color:var(--muted2);text-align:center;line-height:1.85}
+.footer-city{font-size:9px;color:var(--gold3);letter-spacing:3px;text-transform:uppercase}
 
-/* ══ CHAT ══ */
-.chat-hdr{
-  padding:18px 0 16px;
-  border-bottom:.5px solid rgba(200,168,76,.1);
-  display:flex;align-items:center;gap:14px;flex-shrink:0;
-}
-.btn-ghost{
-  background:none;border:.5px solid rgba(200,168,76,.22);
-  padding:8px 18px;border-radius:30px;
-  font-family:'DM Sans',sans-serif;font-size:10px;font-weight:400;
-  cursor:pointer;color:var(--cream2);letter-spacing:1.5px;text-transform:uppercase;
-  transition:all .2s;white-space:nowrap;
-}
-.btn-ghost:hover{background:var(--gold4);border-color:rgba(200,168,76,.5)}
-.btn-ghost:disabled{opacity:.3;cursor:not-allowed}
+/* CHAT */
+.chat-hdr{padding:16px 0 14px;border-bottom:.5px solid rgba(197,164,74,.1);display:flex;align-items:center;gap:14px;flex-shrink:0}
+.btn-ghost{background:none;border:.5px solid rgba(197,164,74,.2);padding:8px 18px;border-radius:30px;font-family:'DM Sans',sans-serif;font-size:9px;font-weight:400;cursor:pointer;color:var(--cream2);letter-spacing:2px;text-transform:uppercase;transition:all .2s;white-space:nowrap}
+.btn-ghost:hover{background:var(--golda);border-color:rgba(197,164,74,.5)}
+.btn-ghost:disabled{opacity:.28;cursor:not-allowed}
 .chat-info{flex:1;min-width:0}
-.chat-ttl{
-  font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:400;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--cream);
-}
-.chat-sub-txt{font-size:10px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:6px}
+.chat-ttl{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--cream)}
+.chat-sub-t{font-size:10px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:6px}
 
-.chat-body{
-  flex:1;overflow-y:auto;padding:28px 0;
-  display:flex;flex-direction:column;gap:10px;
-}
+/* SOUND BTN */
+.btn-sound{background:none;border:.5px solid rgba(197,164,74,.15);padding:6px 12px;border-radius:20px;font-family:'DM Sans',sans-serif;font-size:9px;cursor:pointer;color:var(--muted);letter-spacing:1px;transition:all .2s;flex-shrink:0}
+.btn-sound.on{color:var(--gold3);border-color:rgba(197,164,74,.3)}
+
+.chat-body{flex:1;overflow-y:auto;padding:24px 0;display:flex;flex-direction:column;gap:10px}
 .chat-body::-webkit-scrollbar{width:2px}
-.chat-body::-webkit-scrollbar-thumb{background:rgba(200,168,76,.15);border-radius:1px}
+.chat-body::-webkit-scrollbar-thumb{background:rgba(197,164,74,.12);border-radius:1px}
 
-/* WAITING STATE */
-.chat-waiting{
-  flex:1;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;
-  gap:20px;text-align:center;padding:40px;
-}
-.w-ring{
-  width:56px;height:56px;border-radius:50%;
-  border:.5px solid rgba(200,168,76,.3);
-  position:relative;
-}
-.w-ring::after{
-  content:'';position:absolute;inset:6px;border-radius:50%;
-  border:.5px solid rgba(200,168,76,.15);
-  animation:ringPulse 2.5s ease infinite;
-}
-@keyframes ringPulse{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.1);opacity:1}}
-.w-ring-dot{
-  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  width:6px;height:6px;background:var(--gold);border-radius:50%;
-  animation:pulse 2.5s infinite;
-}
-.w-title{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:300;color:var(--cream2);font-style:italic}
-.w-sub{font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
+.chat-waiting{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;text-align:center;padding:40px}
+.w-ring{width:60px;height:60px;border-radius:50%;border:.5px solid rgba(197,164,74,.25);position:relative}
+.w-ring::after{content:'';position:absolute;inset:8px;border-radius:50%;border:.5px solid rgba(197,164,74,.12);animation:ringP 2.8s ease infinite}
+@keyframes ringP{0%,100%{transform:scale(1);opacity:.4}50%{transform:scale(1.08);opacity:1}}
+.w-dot{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:6px;height:6px;background:var(--gold);border-radius:50%;animation:blink 2.5s infinite}
+.w-ttl{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:300;color:var(--cream2);font-style:italic}
+.w-sub{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
 
-.msg{
-  max-width:70%;padding:13px 18px;border-radius:16px;
-  font-size:14px;line-height:1.75;font-weight:300;
-  animation:mIn .25s ease;
-}
+.msg{max-width:70%;padding:13px 17px;border-radius:16px;font-size:14px;line-height:1.78;font-weight:300;animation:mIn .25s ease}
 @keyframes mIn{from{opacity:0;transform:translateY(6px)}}
 .msg.them{background:var(--bg3);color:var(--cream2);border-bottom-left-radius:3px;align-self:flex-start;border:.5px solid rgba(255,255,255,.04)}
 .msg.you{background:var(--gold);color:var(--bg);border-bottom-right-radius:3px;align-self:flex-end;font-weight:400}
-.msg.addio{
-  background:rgba(200,168,76,.08);color:var(--gold2);
-  border:.5px solid rgba(200,168,76,.22);
-  align-self:center;max-width:88%;text-align:center;
-  font-style:italic;border-radius:12px;
-}
-.msg-sys{
-  text-align:center;font-size:11px;color:var(--muted);
-  padding:6px 0;align-self:center;font-style:italic;letter-spacing:.5px;
-}
-.msg-blocked{
-  text-align:center;font-size:12px;color:white;
-  background:var(--danger);border-radius:10px;
-  padding:12px 20px;align-self:center;max-width:88%;font-weight:500;
-}
-.typing{
-  align-self:flex-start;padding:13px 18px;
-  background:var(--bg3);border-radius:16px;border-bottom-left-radius:3px;
-  border:.5px solid rgba(255,255,255,.04);
-  display:none;gap:5px;align-items:center;
-}
-.typing.show{display:flex}
+.msg.addio{background:rgba(197,164,74,.07);color:var(--gold2);border:.5px solid rgba(197,164,74,.2);align-self:center;max-width:88%;text-align:center;font-style:italic;border-radius:12px}
+.msg-sys{text-align:center;font-size:11px;color:var(--muted);padding:6px 0;align-self:center;font-style:italic}
+.msg-blocked{text-align:center;font-size:12px;color:white;background:var(--danger);border-radius:10px;padding:12px 20px;align-self:center;max-width:88%;font-weight:500}
+.typing-ind{align-self:flex-start;padding:12px 16px;background:var(--bg3);border-radius:16px;border-bottom-left-radius:3px;border:.5px solid rgba(255,255,255,.04);display:none;gap:5px;align-items:center}
+.typing-ind.show{display:flex}
 .tdot{width:4px;height:4px;background:var(--muted);border-radius:50%;animation:bounce 1.2s infinite}
 .tdot:nth-child(2){animation-delay:.15s}.tdot:nth-child(3){animation-delay:.3s}
 @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
 
-.chat-notice{
-  background:rgba(155,32,32,.08);border:.5px solid rgba(155,32,32,.2);
-  border-radius:8px;padding:10px 16px;
-  font-size:11px;color:rgba(245,239,228,.38);line-height:1.6;
-  flex-shrink:0;margin:6px 0;
-}
-.chat-notice strong{color:rgba(245,239,228,.6)}
-
-.chat-inp-row{
-  padding:14px 0 28px;
-  border-top:.5px solid rgba(200,168,76,.08);
-  display:flex;gap:10px;align-items:flex-end;flex-shrink:0;
-}
-.chat-inp{
-  flex:1;background:var(--bg2);
-  border:.5px solid rgba(200,168,76,.18);
-  border-radius:22px;padding:13px 20px;
-  font-family:'DM Sans',sans-serif;font-size:14px;font-weight:300;
-  outline:none;resize:none;max-height:120px;line-height:1.5;
-  color:var(--cream);transition:border-color .2s;
-}
+.chat-notice{background:rgba(139,28,28,.07);border:.5px solid rgba(139,28,28,.18);border-radius:8px;padding:10px 16px;font-size:11px;color:rgba(245,239,227,.35);line-height:1.6;flex-shrink:0;margin:6px 0}
+.chat-notice strong{color:rgba(245,239,227,.58)}
+.chat-inp-row{padding:12px 0 26px;border-top:.5px solid rgba(197,164,74,.07);display:flex;gap:10px;align-items:flex-end;flex-shrink:0}
+.chat-inp{flex:1;background:var(--bg2);border:.5px solid rgba(197,164,74,.16);border-radius:22px;padding:13px 20px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:300;outline:none;resize:none;max-height:120px;line-height:1.5;color:var(--cream);transition:border-color .2s}
 .chat-inp::placeholder{color:var(--muted)}
-.chat-inp:focus{border-color:rgba(200,168,76,.45)}
-.chat-inp:disabled{opacity:.3;cursor:not-allowed}
-.btn-send{
-  width:44px;height:44px;background:var(--gold);
-  border:none;border-radius:50%;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;transition:opacity .2s,transform .15s;
-}
+.chat-inp:focus{border-color:rgba(197,164,74,.42)}
+.chat-inp:disabled{opacity:.28;cursor:not-allowed}
+.btn-send{width:44px;height:44px;background:var(--gold);border:none;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .2s,transform .15s}
 .btn-send:hover{opacity:.82;transform:scale(.94)}
-.btn-send:disabled{opacity:.22;cursor:not-allowed;transform:none}
+.btn-send:disabled{opacity:.2;cursor:not-allowed;transform:none}
 
-/* ══ ECO SCREEN ══ */
+/* ECO */
 #eco-screen{background:var(--bg);overflow:hidden}
-.eco-nav{
-  padding:20px 52px;display:flex;align-items:center;justify-content:space-between;
-  border-bottom:.5px solid rgba(200,168,76,.08);flex-shrink:0;z-index:10;
-}
+.eco-nav{padding:18px 52px;display:flex;align-items:center;justify-content:space-between;border-bottom:.5px solid rgba(197,164,74,.07);flex-shrink:0;z-index:10}
 .eco-center{text-align:center}
-.eco-ttl{font-family:'Cormorant Garamond',serif;font-size:21px;font-weight:300;color:var(--cream);letter-spacing:-.3px}
-.eco-sub-ttl{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--gold3);margin-top:2px}
+.eco-ttl{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:300;color:var(--cream);letter-spacing:-.3px}
+.eco-sub{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--gold3);margin-top:2px}
 .eco-canvas{flex:1;position:relative;overflow:hidden}
-.eco-word{
-  position:absolute;font-family:'Cormorant Garamond',serif;
-  font-style:italic;color:var(--gold);
-  pointer-events:none;user-select:none;white-space:nowrap;
-  text-shadow:0 0 30px rgba(200,168,76,.2);
-}
-.eco-foot{
-  padding:18px 52px;border-top:.5px solid rgba(200,168,76,.08);
-  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
-}
+.eco-word{position:absolute;font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--gold);pointer-events:none;user-select:none;white-space:nowrap;text-shadow:0 0 32px rgba(197,164,74,.18)}
+.eco-foot{padding:16px 52px;border-top:.5px solid rgba(197,164,74,.07);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .eco-ct{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
 .eco-ct span{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--gold);vertical-align:middle;margin-right:4px}
-.eco-note{font-size:11px;color:var(--muted2);font-style:italic;text-align:right;max-width:280px;line-height:1.6}
+.eco-note{font-size:11px;color:var(--muted2);font-style:italic;text-align:right;max-width:260px;line-height:1.65}
 
-/* ══ ECO MODAL ══ */
-#eco-modal{
-  position:fixed;inset:0;background:rgba(10,9,8,.97);
-  display:none;flex-direction:column;align-items:center;justify-content:center;
-  z-index:8500;text-align:center;padding:40px;
-}
+#eco-modal{position:fixed;inset:0;background:rgba(9,8,6,.97);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:8500;text-align:center;padding:40px}
 #eco-modal.active{display:flex;animation:fIn .5s ease}
-.eco-m-icon{font-size:44px;margin-bottom:20px}
-.eco-m-title{font-family:'Cormorant Garamond',serif;font-size:clamp(26px,5vw,42px);font-weight:300;color:var(--cream);letter-spacing:-1px;margin-bottom:12px}
+.eco-m-ico{font-size:44px;margin-bottom:20px}
+.eco-m-ttl{font-family:'Cormorant Garamond',serif;font-size:clamp(26px,5vw,42px);font-weight:300;color:var(--cream);letter-spacing:-1px;margin-bottom:12px}
 .eco-m-sub{font-size:15px;color:var(--cream2);max-width:360px;line-height:1.85;font-weight:300;margin-bottom:32px}
-.eco-m-inp{
-  background:rgba(255,255,255,.04);border:.5px solid rgba(200,168,76,.4);
-  border-radius:10px;padding:16px 24px;color:var(--cream);
-  font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:300;
-  text-align:center;outline:none;width:100%;max-width:280px;
-  letter-spacing:3px;transition:border-color .3s;
-}
-.eco-m-inp::placeholder{color:rgba(245,239,228,.18);font-size:15px;letter-spacing:1px;font-family:'DM Sans',sans-serif}
+.eco-m-inp{background:rgba(255,255,255,.04);border:.5px solid rgba(197,164,74,.38);border-radius:10px;padding:16px 24px;color:var(--cream);font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:300;text-align:center;outline:none;width:100%;max-width:280px;letter-spacing:3px;transition:border-color .3s}
+.eco-m-inp::placeholder{color:rgba(245,239,227,.15);font-size:15px;letter-spacing:1px;font-family:'DM Sans',sans-serif}
 .eco-m-inp:focus{border-color:var(--gold)}
 .eco-m-btns{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap;justify-content:center}
 .btn-eco{background:var(--gold);color:var(--bg);border:none;padding:13px 28px;border-radius:40px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;cursor:pointer;letter-spacing:1.5px;text-transform:uppercase;transition:opacity .2s}
 .btn-eco:hover{opacity:.85}
-.btn-eco-skip{background:none;border:.5px solid rgba(200,168,76,.2);color:var(--muted);padding:13px 22px;border-radius:40px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;letter-spacing:1px}
+.btn-eco-skip{background:none;border:.5px solid rgba(197,164,74,.18);color:var(--muted);padding:13px 22px;border-radius:40px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer}
 
-/* ══ DISINTEGRAZIONE ══ */
-#dis-overlay{
-  position:fixed;inset:0;background:rgba(10,9,8,.97);
-  display:none;flex-direction:column;align-items:center;justify-content:center;
-  z-index:8800;text-align:center;padding:40px;
-}
+#dis-overlay{position:fixed;inset:0;background:rgba(9,8,6,.97);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:8800;text-align:center;padding:40px}
 #dis-overlay.active{display:flex;animation:fIn .6s ease}
 @keyframes fIn{from{opacity:0}}
-.dis-icon{font-size:48px;margin-bottom:22px}
-.dis-title{font-family:'Cormorant Garamond',serif;font-size:clamp(26px,5vw,48px);font-weight:300;color:var(--cream);letter-spacing:-1px;margin-bottom:12px}
-.dis-sub{font-size:15px;color:var(--cream2);max-width:400px;line-height:1.85;font-weight:300;margin-bottom:32px}
-.dis-stats{
-  background:var(--bg2);border:.5px solid rgba(200,168,76,.18);
-  border-radius:var(--r);padding:24px 36px;margin-bottom:28px;
-  display:flex;gap:32px;align-items:center;flex-wrap:wrap;justify-content:center;
-}
+.dis-ico{font-size:48px;margin-bottom:22px}
+.dis-ttl{font-family:'Cormorant Garamond',serif;font-size:clamp(26px,5vw,48px);font-weight:300;color:var(--cream);letter-spacing:-1px;margin-bottom:12px}
+.dis-sub{font-size:15px;color:var(--cream2);max-width:400px;line-height:1.85;font-weight:300;margin-bottom:30px}
+.dis-stats{background:var(--bg2);border:.5px solid rgba(197,164,74,.16);border-radius:var(--r);padding:22px 34px;margin-bottom:26px;display:flex;gap:30px;align-items:center;flex-wrap:wrap;justify-content:center}
 .ds{display:flex;flex-direction:column;align-items:center;gap:4px}
 .ds-num{font-family:'Cormorant Garamond',serif;font-size:38px;font-weight:600;color:var(--gold);line-height:1}
 .ds-lbl{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted)}
-.dis-share-txt{font-size:13px;color:var(--cream2);margin-bottom:20px;line-height:1.75}
+.dis-share{font-size:13px;color:var(--cream2);margin-bottom:20px;line-height:1.75}
 .btn-share{background:var(--gold);color:var(--bg);border:none;padding:13px 28px;border-radius:40px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;cursor:pointer;letter-spacing:1.5px;text-transform:uppercase;transition:opacity .2s;margin-right:10px}
 .btn-share:hover{opacity:.85}
-.btn-ghost-w{background:none;border:.5px solid rgba(200,168,76,.25);color:var(--gold3);padding:13px 22px;border-radius:40px;font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:1px;cursor:pointer}
+.btn-ghost-w{background:none;border:.5px solid rgba(197,164,74,.22);color:var(--gold3);padding:13px 22px;border-radius:40px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer}
 
-/* ══ DISCLAIMER ══ */
 .disc-body{max-width:680px;margin:0 auto;padding:80px 52px}
 .disc-back{font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold3);cursor:pointer;display:inline-flex;align-items:center;gap:8px;margin-bottom:52px;background:none;border:none;font-family:'DM Sans',sans-serif}
 .disc-back:hover{color:var(--gold)}
-.disc-h1{font-family:'Cormorant Garamond',serif;font-size:clamp(30px,5vw,52px);font-weight:300;letter-spacing:-1.5px;color:var(--cream);margin-bottom:8px}
-.disc-h1-sub{font-size:13px;color:var(--muted);margin-bottom:52px;font-weight:300}
-.disc-block{margin-bottom:36px}
-.disc-block-t{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--gold3);margin-bottom:14px;padding-bottom:10px;border-bottom:.5px solid rgba(200,168,76,.12)}
-.disc-block p{font-size:14px;color:var(--cream2);line-height:1.85;font-weight:300;margin-bottom:10px}
-.disc-block strong{color:var(--cream);font-weight:500}
+.disc-h1{font-family:'Cormorant Garamond',serif;font-size:clamp(28px,5vw,52px);font-weight:300;letter-spacing:-1.5px;color:var(--cream);margin-bottom:8px}
+.disc-h1-s{font-size:13px;color:var(--muted);margin-bottom:52px;font-weight:300}
+.disc-b{margin-bottom:36px}
+.disc-b-t{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--gold3);margin-bottom:14px;padding-bottom:10px;border-bottom:.5px solid rgba(197,164,74,.1)}
+.disc-b p{font-size:14px;color:var(--cream2);line-height:1.9;font-weight:300;margin-bottom:10px}
+.disc-b strong{color:var(--cream);font-weight:500}
 
-/* ══ BANNED ══ */
-#banned{position:fixed;inset:0;background:#6B0F0F;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:9900;text-align:center;padding:40px}
+#banned{position:fixed;inset:0;background:#5C0F0F;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:9900;text-align:center;padding:40px}
 #banned.active{display:flex;animation:fIn .5s ease}
 .ban-ttl{font-family:'Cormorant Garamond',serif;font-size:clamp(32px,6vw,60px);color:white;font-weight:300;letter-spacing:-2px;margin:18px 0 12px}
-.ban-txt{font-size:14px;color:rgba(255,255,255,.75);max-width:380px;line-height:1.85;font-weight:300}
-.ban-id{margin-top:28px;font-size:10px;letter-spacing:2px;color:rgba(255,255,255,.25);font-family:monospace}
+.ban-txt{font-size:14px;color:rgba(255,255,255,.7);max-width:380px;line-height:1.9;font-weight:300}
+.ban-id{margin-top:28px;font-size:10px;letter-spacing:2px;color:rgba(255,255,255,.22);font-family:monospace}
 
-/* ══ TOAST ══ */
-#toast{
-  position:fixed;bottom:28px;left:50%;
-  transform:translateX(-50%) translateY(70px);
-  background:var(--bg2);color:var(--cream);
-  border:.5px solid rgba(200,168,76,.28);
-  padding:12px 28px;border-radius:40px;
-  font-size:13px;font-weight:300;
-  transition:transform .4s ease;z-index:9600;
-  pointer-events:none;white-space:nowrap;
-}
+#toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(70px);background:var(--bg2);color:var(--cream);border:.5px solid rgba(197,164,74,.25);padding:12px 28px;border-radius:40px;font-size:13px;font-weight:300;transition:transform .4s ease;z-index:9600;pointer-events:none;white-space:nowrap}
 #toast.show{transform:translateX(-50%) translateY(0)}
 
 @media(max-width:640px){
-  nav,.cert-bar,.disc-banner,.battito,.feed-wrap,.emerg,.site-footer{padding-left:20px;padding-right:20px}
-  .hero{padding:60px 20px 48px}
+  nav,.cert-bar,.warn-bar,.battito,.feed-wrap,.emerg,.site-footer{padding-left:20px;padding-right:20px}
+  .hero{padding:64px 20px 52px}
   .sig-inner{padding:24px 22px}
-  .s-divider{padding:44px 20px 28px}
+  .s-div{padding:44px 20px 26px}
   #chat-screen.active{padding:0 18px}
   .disc-body{padding:48px 20px}
   .eco-nav,.eco-foot{padding:16px 20px}
   .dis-stats{gap:18px}
   .battito{gap:18px}
-  .nav-center{display:none}
+  .nav-mid{display:none}
 }
 </style>
 </head>
 <body>
 
-<!-- LOADER -->
 <div id="loader">
-  <div class="l-ornament">Reggio Emilia</div>
+  <div class="l-pre">Reggio Emilia</div>
   <div class="l-logo">ascolta<span>.</span></div>
   <div class="l-sub">la comunità ti sente</div>
-  <div class="l-line"></div>
+  <div class="l-vline"></div>
 </div>
 
-<!-- ════════════════════════
-     HOME
-════════════════════════ -->
 <div id="home" class="screen">
-
   <nav>
     <div class="nav-brand" onclick="mostra('home')">
-      <div class="nav-logo-txt">ascolta.</div>
-      <div class="nav-re">RE</div>
+      <span class="nav-logo-t">ascolta.</span>
+      <span class="nav-re">RE</span>
     </div>
-    <div class="nav-center">
-      <div class="nav-status">
-        <div class="dot" id="sdot"></div>
-        <span id="stxt">connessione…</span>
-      </div>
+    <div class="nav-mid">
+      <div class="nav-status"><div class="dot" id="sdot"></div><span id="stxt">connessione…</span></div>
+      <div class="nav-online">🫀 <span class="online-num" id="online-n">—</span> online</div>
     </div>
-    <div style="display:flex;gap:8px">
+    <div class="nav-right">
       <button class="btn-nav" onclick="mostra('eco-screen')">✦ L'Eco</button>
       <button class="btn-nav" onclick="mostra('disc-screen')">Info</button>
     </div>
   </nav>
 
-  <!-- ONLY HUMAN -->
   <div class="cert-bar">
     <div class="cert-line"></div>
-    <div class="cert-inner">
-      <span style="font-size:13px">🫀</span>
-      <div class="cert-txt"><strong>Only Human</strong> — nessun bot, nessun algoritmo. Solo cuore e tempo di persone reali di Reggio Emilia.</div>
+    <div class="cert-mid">
+      <span style="font-size:12px">🫀</span>
+      <div class="cert-txt"><strong>Only Human</strong> — nessun bot, nessun algoritmo. Solo cuore e tempo di persone reali.</div>
       <div class="cert-badge">Certificato Only Human</div>
     </div>
     <div class="cert-line r"></div>
   </div>
 
-  <!-- DISCLAIMER -->
-  <div class="disc-banner">
-    <span style="font-size:13px;flex-shrink:0">⚠️</span>
-    <p>
-      <strong>Importante:</strong> Ascolta RE non è un servizio medico o psicologico.
-      Emergenza: <strong>112</strong> · Crisi: <strong>800 274 274</strong>.
-      <a href="#" onclick="mostra('disc-screen');return false">Disclaimer completo →</a>
-    </p>
+  <div class="warn-bar">
+    <span style="font-size:12px;flex-shrink:0">⚠️</span>
+    <p><strong>Importante:</strong> Ascolta RE non è un servizio medico o psicologico. Emergenza: <strong>112</strong> · Crisi: <strong>800 274 274</strong>. <a href="#" onclick="mostra('disc-screen');return false">Disclaimer →</a></p>
   </div>
 
-  <!-- BATTITO URBANO -->
   <div class="battito">
-    <div class="b-item"><div class="b-num" id="b-chiesto">—</div><div class="b-lbl">hanno chiesto aiuto</div></div>
+    <div class="b-item"><div class="b-num" id="b-c">—</div><div class="b-lbl">hanno chiesto aiuto</div></div>
     <div class="b-sep"></div>
-    <div class="b-item"><div class="b-num" id="b-dato">—</div><div class="b-lbl">hanno ascoltato</div></div>
+    <div class="b-item"><div class="b-num" id="b-d">—</div><div class="b-lbl">hanno ascoltato</div></div>
     <div class="b-sep"></div>
-    <div class="b-item"><div class="b-num" id="b-chat">—</div><div class="b-lbl">connessioni completate</div></div>
+    <div class="b-item"><div class="b-num" id="b-ch">—</div><div class="b-lbl">connessioni completate</div></div>
     <div class="b-sep"></div>
     <div class="b-date" id="b-date">oggi —</div>
   </div>
 
-  <!-- HERO -->
   <div class="hero">
-    <div class="hero-watermark">Reggio</div>
-    <div class="hero-eyebrow">Progetto Comunità · Reggio Emilia</div>
+    <div class="hero-wm">Reggio</div>
+    <div class="hero-time-msg" id="time-msg"></div>
+    <div class="hero-ey">Progetto Comunità · Reggio Emilia</div>
     <h1 class="hero-title">
       Ogni voce di <em>Reggio</em><br>merita di essere <strong>ascoltata</strong>
     </h1>
-    <p class="hero-sub">
-      Una piattaforma anonima nata per la nostra città.<br>
-      Lancia un segnale — qualcuno è pronto ad ascoltarti.<br>
-      Nessun nome, nessun giudizio. Solo persone reali.
-    </p>
+    <p class="hero-body">Una piattaforma anonima nata per la nostra città.<br>Lancia un segnale — qualcuno è pronto ad ascoltarti.<br>Nessun nome, nessun giudizio. Solo persone reali.</p>
 
     <div class="sig-outer">
       <div class="sig-inner">
-        <div class="sig-header">
-          <div class="sig-dot"></div>
-          <div class="sig-lbl">Lancia un segnale anonimo</div>
-        </div>
-        <textarea class="sig-ta" id="signal-text" maxlength="300"
-          placeholder="Come stai? Cosa ti pesa? Scrivi liberamente — nessuno saprà mai chi sei…" rows="3"></textarea>
-        <div class="sig-footer">
+        <div class="sig-hdr"><div class="sig-dot"></div><div class="sig-lbl">Lancia un segnale anonimo</div></div>
+        <textarea class="sig-ta" id="signal-text" maxlength="300" placeholder="Come stai? Cosa ti pesa? Scrivi liberamente — nessuno saprà mai chi sei…" rows="3"></textarea>
+        <div class="sig-foot">
           <div class="sig-anon"><div class="dot on"></div><span style="font-size:11px;color:var(--muted)">Completamente anonimo</span></div>
           <button class="btn-primary" id="btn-launch" onclick="lanciaSegnal()">Lancia il segnale →</button>
         </div>
+        <div class="spam-msg" id="spam-msg"></div>
       </div>
     </div>
 
-    <div class="hero-scroll">
-      <span>Segnali attivi</span>
-      <div class="scroll-vline"></div>
-    </div>
+    <div class="hero-scroll"><span>Segnali attivi</span><div class="scroll-vl"></div></div>
   </div>
 
-  <!-- FEED -->
-  <div class="s-divider">
-    <div class="s-div-line"></div>
-    <div class="s-div-txt">Segnali in attesa di ascolto</div>
-    <div class="s-div-line"></div>
-  </div>
+  <div class="s-div"><div class="s-div-line"></div><div class="s-div-txt">Segnali in attesa di ascolto</div><div class="s-div-line"></div></div>
 
   <div class="feed-wrap">
     <div class="feed-top">
       <div class="feed-lbl">Dalla comunità reggiana</div>
       <div class="feed-ct" id="feed-count">— attivi</div>
     </div>
-    <div class="feed-grid" id="feed">
-      <div class="feed-vuoto">Connessione in corso…</div>
-    </div>
+    <div class="feed-grid" id="feed"><div class="feed-empty">Connessione in corso…</div></div>
   </div>
 
-  <!-- EMERGENZE -->
   <div class="emerg">
     <div class="emerg-in">
       <div class="emerg-hdr">Numeri di emergenza</div>
@@ -647,56 +386,33 @@ nav{
   </footer>
 </div>
 
-<!-- ════════════════════════
-     CHAT
-════════════════════════ -->
+<!-- CHAT -->
 <div id="chat-screen" class="screen">
   <div class="chat-hdr">
     <button class="btn-ghost" id="btn-addio" onclick="addioGentile()">🌿 Saluta</button>
     <div class="chat-info">
       <div class="chat-ttl" id="chat-title">—</div>
-      <div class="chat-sub-txt">
-        <div class="dot" id="cdot"></div>
-        <span id="cstato">connessione…</span>
-        &nbsp;·&nbsp;solo umani&nbsp;·&nbsp;RE
-      </div>
+      <div class="chat-sub-t"><div class="dot" id="cdot"></div><span id="cstato">connessione…</span>&nbsp;·&nbsp;solo umani&nbsp;·&nbsp;RE</div>
     </div>
+    <button class="btn-sound" id="btn-sound" onclick="toggleSound()" title="Suono notifiche">🔔</button>
   </div>
-
-  <div class="chat-body" id="chat-body">
-    <!-- contenuto dinamico -->
-  </div>
-
-  <div class="chat-notice">
-    ⚠️ Non siamo professionisti. Pericolo: <strong>112</strong> · Crisi: <strong>800 274 274</strong> (gratuito, 24h).
-  </div>
-
+  <div class="chat-body" id="chat-body"></div>
+  <div class="chat-notice">⚠️ Non siamo professionisti. Pericolo: <strong>112</strong> · Crisi: <strong>800 274 274</strong> (gratuito, 24h).</div>
   <div class="chat-inp-row">
-    <textarea class="chat-inp" id="chat-input"
-      placeholder="Scrivi un messaggio…" rows="1"
-      onkeydown="tasto(event)" oninput="resize(this)" disabled></textarea>
+    <textarea class="chat-inp" id="chat-input" placeholder="Scrivi un messaggio…" rows="1" onkeydown="tasto(event)" oninput="onType()" disabled></textarea>
     <button class="btn-send" id="btn-send" onclick="inviaMess()" disabled>
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0A0908" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="22" y1="2" x2="11" y2="13"/>
-        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#090806" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
       </svg>
     </button>
   </div>
 </div>
 
-<!-- ════════════════════════
-     ECO
-════════════════════════ -->
+<!-- ECO -->
 <div id="eco-screen" class="screen">
   <div class="eco-nav">
-    <div class="nav-brand" onclick="mostra('home')" style="cursor:pointer">
-      <div class="nav-logo-txt">ascolta.</div>
-      <div class="nav-re">RE</div>
-    </div>
-    <div class="eco-center">
-      <div class="eco-ttl">✦ L'Eco</div>
-      <div class="eco-sub-ttl">Le parole che rimangono</div>
-    </div>
+    <div class="nav-brand" onclick="mostra('home')" style="cursor:pointer"><span class="nav-logo-t">ascolta.</span><span class="nav-re">RE</span></div>
+    <div class="eco-center"><div class="eco-ttl">✦ L'Eco</div><div class="eco-sub">Le parole che rimangono</div></div>
     <button class="btn-nav" onclick="mostra('home')">← torna</button>
   </div>
   <div class="eco-canvas" id="eco-canvas"></div>
@@ -708,11 +424,10 @@ nav{
 
 <!-- ECO MODAL -->
 <div id="eco-modal">
-  <div class="eco-m-icon">🌿</div>
-  <div class="eco-m-title">Prima che tutto svanisca…</div>
+  <div class="eco-m-ico">🌿</div>
+  <div class="eco-m-ttl">Prima che tutto svanisca…</div>
   <div class="eco-m-sub">In una sola parola — come ti senti adesso?</div>
-  <input class="eco-m-inp" id="eco-input" type="text" maxlength="20"
-    placeholder="una parola…" onkeydown="if(event.key==='Enter')inviaEco()">
+  <input class="eco-m-inp" id="eco-input" type="text" maxlength="20" placeholder="una parola…" onkeydown="if(event.key==='Enter')inviaEco()">
   <div class="eco-m-btns">
     <button class="btn-eco" onclick="inviaEco()">Lascia il tuo eco →</button>
     <button class="btn-eco-skip" onclick="saltaEco()">Salta</button>
@@ -721,73 +436,37 @@ nav{
 
 <!-- DISINTEGRAZIONE -->
 <div id="dis-overlay">
-  <div class="dis-icon">🌿</div>
-  <div class="dis-title">Connessione completata</div>
+  <div class="dis-ico">🌿</div>
+  <div class="dis-ttl">Connessione completata</div>
   <div class="dis-sub">Questa conversazione è stata disintegrata per sempre.<br>Non esiste più nessuna traccia. È stato un dono.</div>
   <div class="dis-stats">
     <div class="ds"><div class="ds-num" id="dis-c">—</div><div class="ds-lbl">hanno chiesto aiuto</div></div>
-    <div style="width:.5px;height:36px;background:rgba(200,168,76,.15)"></div>
+    <div style="width:.5px;height:32px;background:rgba(197,164,74,.12)"></div>
     <div class="ds"><div class="ds-num" id="dis-d">—</div><div class="ds-lbl">hanno ascoltato</div></div>
-    <div style="width:.5px;height:36px;background:rgba(200,168,76,.15)"></div>
+    <div style="width:.5px;height:32px;background:rgba(197,164,74,.12)"></div>
     <div class="ds"><div class="ds-num" id="dis-ch">—</div><div class="ds-lbl">connessioni completate</div></div>
   </div>
-  <div class="dis-share-txt">Oggi <strong id="dis-n">—</strong> reggiani hanno ricevuto ascolto.<br>Condividi con chi ne avrebbe bisogno ❤️</div>
-  <div>
-    <button class="btn-share" onclick="condividi()">Condividi ascolta RE</button>
-    <button class="btn-ghost-w" onclick="chiudiDis()">Torna alla home</button>
-  </div>
+  <div class="dis-share">Oggi <strong id="dis-n">—</strong> reggiani hanno ricevuto ascolto.<br>Condividi con chi ne avrebbe bisogno ❤️</div>
+  <div><button class="btn-share" onclick="condividi()">Condividi ascolta RE</button><button class="btn-ghost-w" onclick="chiudiDis()">Torna alla home</button></div>
 </div>
 
-<!-- ════════════════════════
-     DISCLAIMER
-════════════════════════ -->
+<!-- DISCLAIMER -->
 <div id="disc-screen" class="screen">
   <nav>
-    <div class="nav-brand" onclick="mostra('home')" style="cursor:pointer">
-      <div class="nav-logo-txt">ascolta.</div>
-      <div class="nav-re">RE</div>
-    </div>
+    <div class="nav-brand" onclick="mostra('home')" style="cursor:pointer"><span class="nav-logo-t">ascolta.</span><span class="nav-re">RE</span></div>
   </nav>
   <div class="disc-body">
     <button class="disc-back" onclick="mostra('home')">← Torna alla home</button>
     <div class="disc-h1">Disclaimer & Info</div>
-    <div class="disc-h1-sub">Leggi attentamente prima di usare la piattaforma</div>
-
-    <div class="disc-block">
-      <div class="disc-block-t">Chi siamo</div>
-      <p>Ascolta RE è un <strong>progetto comunitario anonimo</strong> per la città di Reggio Emilia. Non è un'organizzazione né un'azienda. È uno spazio creato da cittadini per cittadini.</p>
-      <p>Non sappiamo chi sei. Non raccogliamo dati personali. Ogni chat si disintegra completamente alla chiusura.</p>
-    </div>
-
-    <div class="disc-block">
-      <div class="disc-block-t">Certificazione Only Human</div>
-      <p><strong>Su ascolta RE non esistono bot, algoritmi o intelligenze artificiali.</strong> Ogni persona che risponde è un essere umano reale di Reggio Emilia.</p>
-      <p>Se un giorno non ci sono connessioni attive, non significa che il sito non funziona — significa semplicemente che in quel momento nessun reggiano ha aperto il cuore. Ed è giusto così.</p>
-    </div>
-
-    <div class="disc-block">
-      <div class="disc-block-t">Cosa non siamo</div>
-      <p><strong>Non siamo psicologi, medici, terapeuti o professionisti della salute mentale.</strong> Ascolta RE non sostituisce una consulenza professionale o un intervento medico.</p>
-    </div>
-
-    <div class="disc-block">
-      <div class="disc-block-t">In caso di emergenza</div>
-      <p><strong>Se sei in pericolo immediato, chiama subito il 112.</strong> Non aspettare, non scrivere qui.</p>
-      <p>Per supporto in crisi: <strong>800 274 274</strong> (gratuito, attivo 24h).</p>
-    </div>
-
-    <div class="disc-block">
-      <div class="disc-block-t">L'Eco e la Privacy</div>
-      <p>Al termine di ogni chat, chi ha ricevuto ascolto può lasciare <strong>una sola parola</strong>. Solo quella parola — senza nessun dato — viene conservata nella sezione L'Eco. Nessun contenuto della conversazione viene mai salvato.</p>
-    </div>
-
-    <div class="disc-block">
-      <div class="disc-block-t">Regole della comunità</div>
-      <p>Ogni messaggio offensivo, razzista, violento o che inciti all'autolesionismo viene <strong>bloccato automaticamente</strong>. Chi lo invia viene <strong>rimosso permanentemente</strong> dalla piattaforma senza possibilità di appello.</p>
-    </div>
-
-    <div class="disc-block">
-      <div class="disc-block-t">Numeri utili a Reggio Emilia</div>
+    <div class="disc-h1-s">Leggi attentamente prima di usare la piattaforma</div>
+    <div class="disc-b"><div class="disc-b-t">Chi siamo</div><p>Ascolta RE è un <strong>progetto comunitario anonimo</strong> per la città di Reggio Emilia. Non raccogliamo dati personali. Ogni chat si disintegra completamente alla chiusura.</p></div>
+    <div class="disc-b"><div class="disc-b-t">Certificazione Only Human</div><p><strong>Su ascolta RE non esistono bot, algoritmi o intelligenze artificiali.</strong> Ogni risposta viene da un essere umano reale di Reggio Emilia. Se un giorno non ci sono connessioni, significa che in quel momento nessun reggiano ha aperto il cuore. Ed è giusto così.</p></div>
+    <div class="disc-b"><div class="disc-b-t">Cosa non siamo</div><p><strong>Non siamo psicologi, medici o terapeuti.</strong> Ascolta RE non sostituisce una consulenza professionale o un intervento medico.</p></div>
+    <div class="disc-b"><div class="disc-b-t">In caso di emergenza</div><p><strong>Se sei in pericolo immediato, chiama subito il 112.</strong> Per crisi: <strong>800 274 274</strong> (gratuito, 24h).</p></div>
+    <div class="disc-b"><div class="disc-b-t">L'Eco e la Privacy</div><p>Al termine di ogni chat, chi ha ricevuto ascolto può lasciare <strong>una sola parola</strong>. Solo quella parola viene conservata nella sezione L'Eco. Nessun contenuto della conversazione viene mai salvato.</p></div>
+    <div class="disc-b"><div class="disc-b-t">Modalità Veglia</div><p>Se un segnale rimane senza risposta per più di 30 minuti, la sua card inizia a <strong>pulsare dolcemente</strong> — un promemoria visivo che qualcuno sta aspettando da un po'. La comunità vede, la comunità risponde.</p></div>
+    <div class="disc-b"><div class="disc-b-t">Regole della comunità</div><p>Ogni messaggio offensivo viene <strong>bloccato automaticamente</strong>. Chi lo invia viene <strong>rimosso permanentemente</strong> senza appello.</p></div>
+    <div class="disc-b"><div class="disc-b-t">Numeri utili a Reggio Emilia</div>
       <p><strong>112</strong> — Emergenze generali (gratuito, 24h)</p>
       <p><strong>800 274 274</strong> — Prevenzione suicidio (gratuito, 24h)</p>
       <p><strong>02 2327 2327</strong> — Telefono Amico (sera e notte)</p>
@@ -798,209 +477,171 @@ nav{
   </div>
 </div>
 
-<!-- BANNED -->
-<div id="banned">
-  <div style="font-size:44px">⛔</div>
-  <div class="ban-ttl">Accesso negato</div>
-  <div class="ban-txt">Hai inviato un contenuto che viola le regole della comunità di Ascolta RE. Sei stato rimosso permanentemente dalla piattaforma.</div>
-  <div class="ban-id" id="ban-id">—</div>
-</div>
-
+<div id="banned"><div style="font-size:44px">⛔</div><div class="ban-ttl">Accesso negato</div><div class="ban-txt">Hai inviato un contenuto che viola le regole della comunità. Sei stato rimosso permanentemente.</div><div class="ban-id" id="ban-id">—</div></div>
 <div id="toast"></div>
 
-<!-- ════════════════════════
-     JAVASCRIPT
-════════════════════════ -->
 <script>
-// ── utils ──
-function getFP(){
-  let f=localStorage.getItem('_re_fp');
-  if(!f){f='RE'+Math.random().toString(36).substr(2,9).toUpperCase();localStorage.setItem('_re_fp',f);}
-  return f;
+// ── AUDIO ──
+let soundOn = false;
+let audioCtx = null;
+function toggleSound(){
+  soundOn = !soundOn;
+  document.getElementById('btn-sound').className = 'btn-sound' + (soundOn ? ' on' : '');
+  document.getElementById('btn-sound').textContent = soundOn ? '🔔' : '🔕';
 }
+function playPing(){
+  if(!soundOn) return;
+  try {
+    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.frequency.value = 528;
+    g.gain.setValueAtTime(.12, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime + .8);
+    o.start(); o.stop(audioCtx.currentTime + .8);
+  } catch(e){}
+}
+
+// ── UTILS ──
+function getFP(){let f=localStorage.getItem('_re_fp');if(!f){f='RE'+Math.random().toString(36).substr(2,9).toUpperCase();localStorage.setItem('_re_fp',f);}return f;}
 function isBan(){return localStorage.getItem('_re_ban')==='1';}
 function setBan(){localStorage.setItem('_re_ban','1');}
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-// ── state ──
+// ── STATE ──
 let socket, sigId=null, mioRuolo=null, addioInviato=false;
 let segnali=[], ecoWords=[], pendingStats=null;
+let typingTimer=null;
 
-// ─────────────────────────────────────
-// SOCKET
-// ─────────────────────────────────────
+// ── MESSAGGIO ADATTIVO NOTTE/GIORNO ──
+function setTimeMsg(){
+  const h = new Date().getHours();
+  const el = document.getElementById('time-msg');
+  if(!el) return;
+  if(h >= 23 || h < 6) el.textContent = 'Anche di notte, Reggio ascolta';
+  else if(h < 12) el.textContent = 'Buongiorno, Reggio';
+  else if(h < 18) el.textContent = 'Nel pomeriggio, Reggio ascolta';
+  else el.textContent = 'Stasera, Reggio ascolta';
+}
+
+// ── SOCKET ──
 function connetti(){
-  socket=io({auth:{fp:getFP()}});
+  socket = io({auth:{fp:getFP()}});
 
-  socket.on('connect',()=>{
-    setStato(true);
-    caricaSegnali();
-    caricaBattito();
-    caricaEco();
-  });
+  socket.on('connect',()=>{ setStato(true); caricaSegnali(); caricaBattito(); caricaEco(); });
   socket.on('disconnect',()=>setStato(false));
-  socket.on('connesso',({anonId})=>{socket.myId=anonId;});
-  socket.on('bannato',()=>{setBan();mostraBan();});
+  socket.on('connesso',({anonId})=>{ socket.myId=anonId; });
+  socket.on('bannato',()=>{ setBan(); mostraBan(); });
+  socket.on('online_count',({count})=>{ document.getElementById('online-n').textContent=count; });
 
-  // Feed
-  socket.on('nuovo_segnale',(s)=>{
-    if(!s.taken) segnali.unshift(s);
-    renderFeed();
+  socket.on('spam_block',({minutiRimasti})=>{
+    const m = document.getElementById('spam-msg');
+    m.style.display='block';
+    m.textContent=`Puoi lanciare un nuovo segnale tra ${minutiRimasti} minut${minutiRimasti===1?'o':'i'}.`;
+    document.getElementById('btn-launch').disabled=true;
+    setTimeout(()=>{ m.style.display='none'; document.getElementById('btn-launch').disabled=false; }, minutiRimasti*60*1000);
   });
+
+  socket.on('nuovo_segnale',(s)=>{ if(!s.taken){ segnali.unshift(s); renderFeed(); }});
   socket.on('segnale_rimosso',(id)=>{
     const card=document.querySelector(`[data-sid="${id}"]`);
-    if(card){
-      card.classList.add('removing');
-      setTimeout(()=>{segnali=segnali.filter(s=>s.id!==id);renderFeed();},400);
-    } else {
-      segnali=segnali.filter(s=>s.id!==id);renderFeed();
-    }
+    if(card){ card.classList.add('removing'); setTimeout(()=>{ segnali=segnali.filter(s=>s.id!==id); renderFeed(); },400); }
+    else { segnali=segnali.filter(s=>s.id!==id); renderFeed(); }
   });
-  socket.on('feed_aggiornato',(list)=>{segnali=list;renderFeed();});
-
-  // Battito
+  socket.on('feed_aggiornato',(list)=>{ segnali=list; renderFeed(); });
   socket.on('battito_update',(s)=>aggiornaBattito(s));
 
-  // ── SEEKER: segnale lanciato con successo ──
   socket.on('segnale_lanciato',({segnaleId})=>{
-    sigId=segnaleId;
-    mioRuolo='seeker';
-    addioInviato=false;
+    sigId=segnaleId; mioRuolo='seeker'; addioInviato=false;
     apriChatSeeker();
   });
+  socket.on('segnale_non_disponibile',()=>{ toast('Questo segnale è già stato preso.'); mostra('home'); });
 
-  socket.on('segnale_non_disponibile',()=>{
-    toast('Questo segnale è già stato preso.');
-    mostra('home');
-  });
-
-  // ── ASCOLTATORE: chat pronta ──
   socket.on('chat_pronta',({ruolo})=>{
     document.getElementById('cstato').textContent='connesso';
     document.getElementById('cdot').classList.add('on');
-    if(ruolo==='ascoltatore'){
-      sblocca();
-      aggSys('Sei connesso. Stai ascoltando qualcuno che ha bisogno di supporto.');
-    }
+    if(ruolo==='ascoltatore'){ sblocca(); aggSys('Sei connesso. Stai ascoltando qualcuno che ha bisogno di supporto.'); }
   });
 
-  // ── SEEKER: arriva l'ascoltatore ──
   socket.on('ascoltatore_arrivato',({segnaleId})=>{
     if(sigId!==segnaleId) return;
     document.getElementById('cstato').textContent='connesso';
     document.getElementById('cdot').classList.add('on');
-    // rimuovi waiting
     const w=document.getElementById('chat-waiting');
     if(w) w.remove();
     sblocca();
     aggSys('Un ascoltatore si è connesso. La chat è aperta. 🌿');
   });
 
-  // Messaggi
-  socket.on('msg_sistema',({text})=>{
-    const w=document.getElementById('chat-waiting');
-    if(w) w.remove();
-    aggSys(text);
-  });
+  socket.on('msg_sistema',({text})=>{ rmWaiting(); aggSys(text); });
 
   socket.on('messaggio',(m)=>{
-    const w=document.getElementById('chat-waiting');
-    if(w) w.remove();
+    rmWaiting();
+    hideTypingInd();
     if(mioRuolo==='seeker') sblocca();
-    const isYou=m.anonId===socket.myId;
+    const isYou = m.anonId===socket.myId;
     aggMsg(m.isAddio?'addio':(isYou?'you':'them'), m.text);
+    if(!isYou) playPing();
   });
 
   socket.on('msg_bloccato',()=>{
-    const d=document.createElement('div');
-    d.className='msg-blocked';
+    const d=document.createElement('div'); d.className='msg-blocked';
     d.textContent='⛔ Messaggio offensivo bloccato. Utente rimosso permanentemente.';
     push(d);
   });
 
-  socket.on('addio_ricevuto',({da})=>{
-    aggSys(`${da==='ascoltatore'?"L'ascoltatore":"Chi ha chiesto ascolto"} ha salutato con gentilezza.`);
-  });
+  // Typing indicators
+  socket.on('typing_start',()=>{ document.getElementById('typing-ind').classList.add('show'); const b=document.getElementById('chat-body'); b.scrollTop=b.scrollHeight; });
+  socket.on('typing_stop',()=>hideTypingInd());
 
-  // Eco
-  socket.on('chiedi_eco',()=>{
-    document.getElementById('eco-input').value='';
-    document.getElementById('eco-modal').classList.add('active');
-  });
+  socket.on('addio_ricevuto',({da})=>{ aggSys(`${da==='ascoltatore'?"L'ascoltatore":"Chi ha chiesto ascolto"} ha salutato con gentilezza.`); });
+
+  socket.on('chiedi_eco',()=>{ document.getElementById('eco-input').value=''; document.getElementById('eco-modal').classList.add('active'); });
+
   socket.on('nuova_eco',(eco)=>{
     ecoWords.push(eco);
     document.getElementById('eco-total').textContent=ecoWords.length;
-    if(document.getElementById('eco-screen').classList.contains('active'))
-      renderEcoWord(eco,true);
+    if(document.getElementById('eco-screen').classList.contains('active')) renderEcoWord(eco,true);
   });
 
-  // Disintegrazione
   socket.on('chat_disintegrata',({stats})=>{
-    sigId=null; mioRuolo=null;
-    pendingStats=stats;
-    if(!document.getElementById('eco-modal').classList.contains('active'))
-      mostraDisintegrazione(stats);
+    sigId=null; mioRuolo=null; pendingStats=stats;
+    if(!document.getElementById('eco-modal').classList.contains('active')) mostraDisintegrazione(stats);
   });
 }
 
-// ─────────────────────────────────────
-// API
-// ─────────────────────────────────────
-async function caricaSegnali(){
-  try{const r=await fetch('/api/segnali');segnali=await r.json();renderFeed();}
-  catch(e){document.getElementById('feed').innerHTML='<div class="feed-vuoto">Impossibile caricare i segnali.</div>';}
-}
-async function caricaBattito(){
-  try{const r=await fetch('/api/battito');aggiornaBattito(await r.json());}catch(e){}
-}
-async function caricaEco(){
-  try{const r=await fetch('/api/eco');ecoWords=await r.json();document.getElementById('eco-total').textContent=ecoWords.length;}catch(e){}
-}
+// ── API ──
+async function caricaSegnali(){ try{ const r=await fetch('/api/segnali'); segnali=await r.json(); renderFeed(); }catch(e){} }
+async function caricaBattito(){ try{ const r=await fetch('/api/battito'); aggiornaBattito(await r.json()); }catch(e){} }
+async function caricaEco(){ try{ const r=await fetch('/api/eco'); ecoWords=await r.json(); document.getElementById('eco-total').textContent=ecoWords.length; }catch(e){} }
 
-// ─────────────────────────────────────
-// BATTITO
-// ─────────────────────────────────────
-function aggiornaBattito(s){
-  animaNum('b-chiesto',s.aiutoChiesto);
-  animaNum('b-dato',s.aiutoDato);
-  animaNum('b-chat',s.chatsCompletate);
-  document.getElementById('b-date').textContent='oggi '+s.date;
-}
-function animaNum(id,val){
-  const el=document.getElementById(id);if(!el)return;
-  if(parseInt(el.textContent)!==val){
-    el.textContent=val;el.classList.add('bump');
-    setTimeout(()=>el.classList.remove('bump'),500);
-  }
-}
+// ── BATTITO ──
+function aggiornaBattito(s){ animaNum('b-c',s.aiutoChiesto); animaNum('b-d',s.aiutoDato); animaNum('b-ch',s.chatsCompletate); document.getElementById('b-date').textContent='oggi '+s.date; }
+function animaNum(id,val){ const el=document.getElementById(id); if(!el) return; if(parseInt(el.textContent)!==val){ el.textContent=val; el.classList.add('bump'); setTimeout(()=>el.classList.remove('bump'),500); } }
 
-// ─────────────────────────────────────
-// FEED + TTL LIVE
-// ─────────────────────────────────────
-function ttlTxt(time){
-  const m=Math.max(0,Math.round((5*60*60*1000-(Date.now()-time))/60000));
-  if(m<=0) return 'in scadenza';
-  if(m>60) return Math.floor(m/60)+'h rimanenti';
-  return m+' min';
-}
+// ── FEED + TTL + VEGLIA ──
+const TTL_VEGLIA = 30*60*1000;
+function ttlTxt(t){ const m=Math.max(0,Math.round((5*60*60*1000-(Date.now()-t))/60000)); if(m<=0) return 'in scadenza'; if(m>60) return Math.floor(m/60)+'h'; return m+' min'; }
+
 function renderFeed(){
   const feed=document.getElementById('feed');
   const liberi=segnali.filter(s=>!s.taken);
   document.getElementById('feed-count').textContent=liberi.length+' attivi';
-  if(!liberi.length){
-    feed.innerHTML='<div class="feed-vuoto">Nessun segnale attivo al momento.<br><em>Sii il primo a lanciarne uno.</em></div>';
-    return;
-  }
+  if(!liberi.length){ feed.innerHTML='<div class="feed-empty">Nessun segnale attivo al momento.<br><em>Sii il primo a lanciarne uno.</em></div>'; return; }
   feed.innerHTML='';
   liberi.slice(0,12).forEach((s,i)=>{
     const m=Math.round((Date.now()-s.time)/60000);
     const t=m<1?'adesso':m<60?m+' min fa':Math.floor(m/60)+'h fa';
+    const veglia = (Date.now()-s.time) > TTL_VEGLIA;
     const el=document.createElement('div');
-    el.className='card';el.dataset.sid=s.id;el.style.animationDelay=(i*.07)+'s';
+    el.className='card'+(veglia?' veglia':'');
+    el.dataset.sid=s.id; el.style.animationDelay=(i*.07)+'s';
     el.innerHTML=`
       <div class="card-meta">
         <div class="card-time">${t}</div>
         <div class="card-tags">
+          ${veglia?'<div class="card-veglia-badge">✦ in attesa da un po\'</div>':''}
           <div class="card-ttl" data-time="${s.time}">⏳ ${ttlTxt(s.time)}</div>
           <div class="card-re">RE</div>
         </div>
@@ -1013,55 +654,42 @@ function renderFeed(){
     feed.appendChild(el);
   });
 }
-// timer live
-setInterval(()=>{
-  document.querySelectorAll('[data-time]').forEach(el=>{
-    el.textContent='⏳ '+ttlTxt(parseInt(el.dataset.time));
-  });
-},60000);
+setInterval(()=>{ document.querySelectorAll('[data-time]').forEach(el=>{ el.textContent='⏳ '+ttlTxt(parseInt(el.dataset.time)); }); },60000);
 
-// ─────────────────────────────────────
-// LANCIA SEGNALE
-// ─────────────────────────────────────
+// ── LANCIA SEGNALE ──
 function lanciaSegnal(){
-  if(isBan()){mostraBan();return;}
+  if(isBan()){ mostraBan(); return; }
   const t=document.getElementById('signal-text').value.trim();
-  if(!t){toast('Scrivi qualcosa prima di lanciare.');return;}
-  if(!socket?.connected){toast('Non connesso al server. Ricarica la pagina.');return;}
+  if(!t){ toast('Scrivi qualcosa prima di lanciare.'); return; }
+  if(!socket?.connected){ toast('Non connesso. Ricarica la pagina.'); return; }
   document.getElementById('btn-launch').disabled=true;
   socket.emit('lancia_segnale',{text:t,fp:getFP()});
   document.getElementById('signal-text').value='';
-  setTimeout(()=>document.getElementById('btn-launch').disabled=false,4000);
+  setTimeout(()=>document.getElementById('btn-launch').disabled=false, 4000);
 }
 
-// ─────────────────────────────────────
-// APERTURA CHAT — SEEKER (chi ha lanciato)
-// ─────────────────────────────────────
+// ── CHAT SEEKER ──
 function apriChatSeeker(){
-  document.getElementById('chat-title').textContent='Il tuo segnale è nell\'aria…';
+  document.getElementById('chat-title').textContent="Il tuo segnale è nell'aria…";
   document.getElementById('cstato').textContent='in attesa di un ascoltatore';
   document.getElementById('cdot').classList.remove('on');
   document.getElementById('chat-input').disabled=true;
   document.getElementById('btn-send').disabled=true;
   document.getElementById('btn-addio').disabled=false;
-
   document.getElementById('chat-body').innerHTML=`
     <div class="chat-waiting" id="chat-waiting">
-      <div class="w-ring"><div class="w-ring-dot"></div></div>
-      <div class="w-title">Il tuo segnale è nell'aria…</div>
+      <div class="w-ring"><div class="w-dot"></div></div>
+      <div class="w-ttl">Il tuo segnale è nell'aria…</div>
       <div class="w-sub">Qualcuno a Reggio Emilia lo raccoglierà</div>
-    </div>`;
-
+    </div>
+    <div class="typing-ind" id="typing-ind"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div>`;
   mostra('chat-screen');
 }
 
-// ─────────────────────────────────────
-// APERTURA CHAT — LISTENER (chi ascolta)
-// ─────────────────────────────────────
+// ── CHAT LISTENER ──
 function apriChatListener(id){
-  if(isBan()){mostraBan();return;}
+  if(isBan()){ mostraBan(); return; }
   sigId=id; mioRuolo='ascoltatore'; addioInviato=false;
-
   const s=segnali.find(x=>x.id===id);
   document.getElementById('chat-title').textContent=s?s.text.slice(0,52)+'…':'In ascolto…';
   document.getElementById('cstato').textContent='connessione…';
@@ -1069,29 +697,20 @@ function apriChatListener(id){
   document.getElementById('chat-input').disabled=true;
   document.getElementById('btn-send').disabled=true;
   document.getElementById('btn-addio').disabled=false;
-
   document.getElementById('chat-body').innerHTML=`
-    <div class="typing show" id="typing">
-      <div class="tdot"></div><div class="tdot"></div><div class="tdot"></div>
-    </div>`;
-
+    <div class="typing-ind show" id="typing-ind"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div>`;
   mostra('chat-screen');
   socket.emit('entra_chat',{segnaleId:id});
 }
 
-// ─────────────────────────────────────
-// CHAT ACTIONS
-// ─────────────────────────────────────
-function sblocca(){
-  document.getElementById('chat-input').disabled=false;
-  document.getElementById('btn-send').disabled=false;
-  const t=document.getElementById('typing');
-  if(t) t.classList.remove('show');
-}
+// ── CHAT HELPERS ──
+function sblocca(){ document.getElementById('chat-input').disabled=false; document.getElementById('btn-send').disabled=false; hideTypingInd(); }
+function rmWaiting(){ const w=document.getElementById('chat-waiting'); if(w) w.remove(); }
+function hideTypingInd(){ const t=document.getElementById('typing-ind'); if(t) t.classList.remove('show'); }
 
 function addioGentile(){
-  if(!sigId||addioInviato)return;
-  if(!confirm('Vuoi salutare e chiudere questa conversazione?\n\nViene inviato l\'Addio Gentile e la chat sarà disintegrata per sempre.'))return;
+  if(!sigId||addioInviato) return;
+  if(!confirm("Vuoi salutare e chiudere questa conversazione?\n\nViene inviato l'Addio Gentile e la chat sarà disintegrata per sempre.")) return;
   addioInviato=true;
   document.getElementById('btn-addio').disabled=true;
   document.getElementById('chat-input').disabled=true;
@@ -1100,131 +719,69 @@ function addioGentile(){
 }
 
 function inviaMess(){
-  if(isBan()||addioInviato)return;
+  if(isBan()||addioInviato) return;
   const inp=document.getElementById('chat-input');
-  const t=inp.value.trim();
-  if(!t||!sigId)return;
-  inp.value='';inp.style.height='';
+  const t=inp.value.trim(); if(!t||!sigId) return;
+  inp.value=''; inp.style.height='';
+  clearTimeout(typingTimer);
+  socket.emit('typing_stop',{segnaleId:sigId});
   socket.emit('messaggio',{segnaleId:sigId,text:t,fp:getFP()});
 }
 
-function tasto(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();inviaMess();}}
-function resize(el){el.style.height='';el.style.height=Math.min(el.scrollHeight,120)+'px';}
-
-// ─────────────────────────────────────
-// CHAT UI
-// ─────────────────────────────────────
-function push(el){
-  const b=document.getElementById('chat-body');
-  b.appendChild(el);b.scrollTop=b.scrollHeight;
-}
-function aggMsg(tipo,text){
-  const d=document.createElement('div');
-  d.className='msg '+tipo;d.textContent=text;push(d);
-}
-function aggSys(text){
-  const d=document.createElement('div');
-  d.className='msg-sys';d.textContent=text;push(d);
+function onType(){
+  resize(document.getElementById('chat-input'));
+  if(!sigId) return;
+  socket.emit('typing_start',{segnaleId:sigId});
+  clearTimeout(typingTimer);
+  typingTimer=setTimeout(()=>socket.emit('typing_stop',{segnaleId:sigId}), 2000);
 }
 
-// ─────────────────────────────────────
-// ECO
-// ─────────────────────────────────────
-function inviaEco(){
-  const w=document.getElementById('eco-input').value.trim();
-  if(w&&socket?.connected) socket.emit('invia_eco',{word:w});
-  chiudiEcoModal();
-}
-function saltaEco(){chiudiEcoModal();}
-function chiudiEcoModal(){
-  document.getElementById('eco-modal').classList.remove('active');
-  if(pendingStats){mostraDisintegrazione(pendingStats);pendingStats=null;}
-}
-function renderEcoScreen(){
-  document.getElementById('eco-canvas').innerHTML='';
-  ecoWords.forEach(w=>renderEcoWord(w,false));
-  document.getElementById('eco-total').textContent=ecoWords.length;
-}
+function tasto(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); inviaMess(); } }
+function resize(el){ el.style.height=''; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
+
+function push(el){ const b=document.getElementById('chat-body'); b.appendChild(el); b.scrollTop=b.scrollHeight; }
+function aggMsg(tipo,text){ const d=document.createElement('div'); d.className='msg '+tipo; d.textContent=text; push(d); }
+function aggSys(text){ const d=document.createElement('div'); d.className='msg-sys'; d.textContent=text; push(d); }
+
+// ── ECO ──
+function inviaEco(){ const w=document.getElementById('eco-input').value.trim(); if(w&&socket?.connected) socket.emit('invia_eco',{word:w}); chiudiEcoModal(); }
+function saltaEco(){ chiudiEcoModal(); }
+function chiudiEcoModal(){ document.getElementById('eco-modal').classList.remove('active'); if(pendingStats){ mostraDisintegrazione(pendingStats); pendingStats=null; } }
+
+function renderEcoScreen(){ document.getElementById('eco-canvas').innerHTML=''; ecoWords.forEach(w=>renderEcoWord(w,false)); document.getElementById('eco-total').textContent=ecoWords.length; }
 function renderEcoWord(eco,isNew){
   const c=document.getElementById('eco-canvas');
-  const W=c.offsetWidth||window.innerWidth;
-  const H=c.offsetHeight||(window.innerHeight-160);
-  const el=document.createElement('div');
-  el.className='eco-word';
+  const el=document.createElement('div'); el.className='eco-word';
   const age=(Date.now()-eco.time)/(1000*3600*24);
-  const size=Math.max(13,Math.min(54,50-age*2+Math.random()*18));
-  el.style.fontSize=size+'px';
+  el.style.fontSize=Math.max(13,Math.min(56,52-age*2+Math.random()*18))+'px';
   const s0=eco.id.charCodeAt(0)+eco.id.charCodeAt(1);
   el.style.left=((s0*137)%80+5)+'%';
   el.style.top=(isNew?Math.random()*70+10:((s0*97)%70+10))+'%';
-  const op=0.35+Math.random()*.65;
-  el.style.opacity=op;
-  el.textContent=eco.word;
-  c.appendChild(el);
-  if(isNew) el.animate([{opacity:0,transform:'scale(.4)'},{opacity:1,transform:'scale(1.1)'},{opacity:op,transform:'scale(1)'}],{duration:700,fill:'forwards'});
-  el.animate(
-    [{transform:'translateY(0)',opacity:op*.65},{transform:`translateY(${Math.random()*10-5}px)`,opacity:op}],
-    {duration:(9+Math.random()*11)*1000,iterations:Infinity,direction:'alternate',easing:'ease-in-out',delay:Math.random()*6000}
-  );
+  const op=0.32+Math.random()*.68; el.style.opacity=op;
+  el.textContent=eco.word; c.appendChild(el);
+  if(isNew) el.animate([{opacity:0,transform:'scale(.3)'},{opacity:1,transform:'scale(1.12)'},{opacity:op,transform:'scale(1)'}],{duration:700,fill:'forwards'});
+  el.animate([{transform:'translateY(0)',opacity:op*.6},{transform:`translateY(${Math.random()*10-5}px)`,opacity:op}],{duration:(9+Math.random()*12)*1000,iterations:Infinity,direction:'alternate',easing:'ease-in-out',delay:Math.random()*6000});
 }
 
-// ─────────────────────────────────────
-// DISINTEGRAZIONE
-// ─────────────────────────────────────
-function mostraDisintegrazione(s){
-  document.getElementById('dis-c').textContent=s.aiutoChiesto;
-  document.getElementById('dis-d').textContent=s.aiutoDato;
-  document.getElementById('dis-ch').textContent=s.chatsCompletate;
-  document.getElementById('dis-n').textContent=s.aiutoChiesto;
-  document.getElementById('dis-overlay').classList.add('active');
-}
-function chiudiDis(){
-  document.getElementById('dis-overlay').classList.remove('active');
-  mostra('home');
-}
-function condividi(){
-  const n=document.getElementById('dis-n').textContent;
-  const txt=`Oggi ${n} reggiani hanno ricevuto ascolto su ascolta RE — la piattaforma anonima, solo umana, per Reggio Emilia ❤️`;
-  if(navigator.share) navigator.share({title:'ascolta RE',text:txt});
-  else navigator.clipboard.writeText(txt).then(()=>toast('Testo copiato!'));
-}
+// ── DISINTEGRAZIONE ──
+function mostraDisintegrazione(s){ document.getElementById('dis-c').textContent=s.aiutoChiesto; document.getElementById('dis-d').textContent=s.aiutoDato; document.getElementById('dis-ch').textContent=s.chatsCompletate; document.getElementById('dis-n').textContent=s.aiutoChiesto; document.getElementById('dis-overlay').classList.add('active'); }
+function chiudiDis(){ document.getElementById('dis-overlay').classList.remove('active'); mostra('home'); }
+function condividi(){ const n=document.getElementById('dis-n').textContent; const txt=`Oggi ${n} reggiani hanno ricevuto ascolto su ascolta RE — la piattaforma anonima, solo umana, per Reggio Emilia ❤️`; if(navigator.share) navigator.share({title:'ascolta RE',text:txt}); else navigator.clipboard.writeText(txt).then(()=>toast('Testo copiato!')); }
 
-// ─────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────
-function mostraBan(){
-  setBan();if(socket)socket.disconnect();
-  document.getElementById('ban-id').textContent='ID: '+getFP()+' · Permanente';
-  document.getElementById('banned').classList.add('active');
-}
-function mostra(id){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  window.scrollTo(0,0);
-  if(id==='eco-screen') setTimeout(renderEcoScreen,80);
-}
-function setStato(on){
-  document.getElementById('sdot').className='dot'+(on?' on':'');
-  document.getElementById('stxt').textContent=on?'online · Reggio Emilia':'disconnesso';
-}
+// ── HELPERS ──
+function mostraBan(){ setBan(); if(socket) socket.disconnect(); document.getElementById('ban-id').textContent='ID: '+getFP()+' · Permanente'; document.getElementById('banned').classList.add('active'); }
+function mostra(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); window.scrollTo(0,0); if(id==='eco-screen') setTimeout(renderEcoScreen,80); }
+function setStato(on){ document.getElementById('sdot').className='dot'+(on?' on':''); document.getElementById('stxt').textContent=on?'online · Reggio Emilia':'disconnesso'; }
 let _tt;
-function toast(msg){
-  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
-  clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),3500);
-}
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(_tt); _tt=setTimeout(()=>t.classList.remove('show'),3500); }
 
-// ─────────────────────────────────────
-// INIT
-// ─────────────────────────────────────
+// ── INIT ──
 window.addEventListener('load',()=>{
-  if(isBan()){mostraBan();return;}
+  setTimeMsg();
+  if(isBan()){ mostraBan(); return; }
   setTimeout(()=>{
     document.getElementById('loader').classList.add('out');
-    setTimeout(()=>{
-      document.getElementById('loader').style.display='none';
-      mostra('home');
-      connetti();
-    },900);
+    setTimeout(()=>{ document.getElementById('loader').style.display='none'; mostra('home'); connetti(); },900);
   },3400);
 });
 </script>

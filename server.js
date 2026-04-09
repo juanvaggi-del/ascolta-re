@@ -16,124 +16,97 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.static(path.join(__dirname)));
 
-// ══════════════════════════════════════
-// MODERAZIONE
-// ══════════════════════════════════════
 const PAROLE_VIETATE = [
   'cazzo','vaffanculo','frocio','negro','troia','puttana','bastardo',
   'imbecille','ritardato','suicid','ammazzati','ucciditi','razzist',
   'terrorist','stupro','pezzo di merda','odio','vattene a fanculo',
   'gay di merda','negro di merda'
 ];
-function isTossico(t) {
-  const l = t.toLowerCase();
-  return PAROLE_VIETATE.some(p => l.includes(p));
-}
+function isTossico(t) { return PAROLE_VIETATE.some(p => t.toLowerCase().includes(p)); }
 function uid() { return crypto.randomBytes(4).toString('hex').toUpperCase(); }
 
-// ══════════════════════════════════════
-// STATO
-// ══════════════════════════════════════
-const bannatiIP  = new Set();
-const bannatiID  = new Set();
+const bannatiIP = new Set();
+const bannatiID = new Set();
+const segnali   = new Map();
+const rooms     = new Map();
+const ascDisponibili = new Map();
+let onlineCount = 0;
 
-// segnali[id] = { id, text, time, seekerSocketId, taken }
-const segnali = new Map();
-
-// rooms[segnaleId] = { seekerSocketId, listenerSocketId, closedBy: Set }
-const rooms = new Map();
-
-// eco words
 let ecoWords = [
-  { id: uid(), word: 'Ascoltato',  time: Date.now() - 3600000 },
-  { id: uid(), word: 'Leggero',    time: Date.now() - 7200000 },
-  { id: uid(), word: 'Vivo',       time: Date.now() - 10800000 },
-  { id: uid(), word: 'Speranza',   time: Date.now() - 14400000 },
-  { id: uid(), word: 'Grato',      time: Date.now() - 18000000 },
-  { id: uid(), word: 'Capito',     time: Date.now() - 21600000 },
-  { id: uid(), word: 'Sollievo',   time: Date.now() - 25200000 },
-  { id: uid(), word: 'Meno solo',  time: Date.now() - 28800000 },
+  { id:uid(), word:'Ascoltato',  time:Date.now()-3600000  },
+  { id:uid(), word:'Leggero',    time:Date.now()-7200000  },
+  { id:uid(), word:'Vivo',       time:Date.now()-10800000 },
+  { id:uid(), word:'Speranza',   time:Date.now()-14400000 },
+  { id:uid(), word:'Grato',      time:Date.now()-18000000 },
+  { id:uid(), word:'Capito',     time:Date.now()-21600000 },
+  { id:uid(), word:'Sollievo',   time:Date.now()-25200000 },
+  { id:uid(), word:'Meno solo',  time:Date.now()-28800000 },
+  { id:uid(), word:'Respirare',  time:Date.now()-32400000 },
+  { id:uid(), word:'Grazie',     time:Date.now()-36000000 },
 ];
 
-// statistiche
 let stats = { date: oggi(), aiutoChiesto: 3, aiutoDato: 0, chatsCompletate: 0 };
 
 function oggi() {
-  return new Date().toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
 }
 function resetStats() {
   const d = oggi();
-  if (stats.date !== d) stats = { date: d, aiutoChiesto: 0, aiutoDato: 0, chatsCompletate: 0 };
+  if (stats.date !== d) stats = { date:d, aiutoChiesto:0, aiutoDato:0, chatsCompletate:0 };
+}
+function broadcastOnline() {
+  io.emit('online_count', { count: onlineCount, ascoltatori: ascDisponibili.size });
 }
 
-// Segnali demo iniziali
 ['Ho passato una settimana difficile e non so con chi parlarne.',
- 'Mi sento solo, anche in mezzo alla gente. Qualcuno capisce?',
+ 'Mi sento solo anche in mezzo alla gente. Qualcuno capisce?',
  'Sto attraversando un momento di cambiamento difficile.']
 .forEach((text, i) => {
-  const id = uid() + uid();
-  segnali.set(id, { id, text, time: Date.now() - (i+1)*120000, seekerSocketId: null, taken: false });
+  const id = uid()+uid();
+  segnali.set(id, { id, text, time: Date.now()-(i+1)*180000, seekerSocketId:null, taken:false });
 });
 
-// ══════════════════════════════════════
-// TTL: rimuovi segnali dopo 5 ore
-// ══════════════════════════════════════
 const TTL = 5 * 60 * 60 * 1000;
 setInterval(() => {
-  const now = Date.now();
   let changed = false;
   for (const [id, s] of segnali) {
-    if (!s.taken && (now - s.time) > TTL) {
-      segnali.delete(id);
-      changed = true;
-    }
+    if (!s.taken && (Date.now()-s.time) > TTL) { segnali.delete(id); changed = true; }
   }
   if (changed) io.emit('feed_aggiornato', getFeed());
-}, 60 * 1000);
+}, 60000);
 
-// ══════════════════════════════════════
-// HELPERS
-// ══════════════════════════════════════
 function getFeed() {
   return Array.from(segnali.values())
     .filter(s => !s.taken)
     .sort((a, b) => b.time - a.time)
     .slice(0, 20);
 }
-
-function getSocket(id) {
-  return id ? io.sockets.sockets.get(id) : null;
+function getSocket(id) { return id ? io.sockets.sockets.get(id) : null; }
+function getIP(socket) {
+  return (socket.handshake.headers['x-forwarded-for'] || '').split(',')[0].trim()
+    || socket.handshake.address;
 }
 
-// ══════════════════════════════════════
-// REST API
-// ══════════════════════════════════════
-app.get('/api/segnali', (_, res) => res.json(getFeed()));
-app.get('/api/battito', (_, res) => { resetStats(); res.json(stats); });
-app.get('/api/eco',     (_, res) => res.json(ecoWords.slice(-120)));
-app.get('/api/health',  (_, res) => res.json({ ok: true, segnali: segnali.size, rooms: rooms.size }));
+app.get('/api/segnali',  (_, res) => res.json(getFeed()));
+app.get('/api/battito',  (_, res) => { resetStats(); res.json(stats); });
+app.get('/api/eco',      (_, res) => res.json(ecoWords.slice(-120)));
+app.get('/api/presenza', (_, res) => res.json({ online: onlineCount, ascoltatori: ascDisponibili.size }));
+app.get('/api/health',   (_, res) => res.json({ ok:true }));
 
-// ══════════════════════════════════════
-// WEBSOCKET
-// ══════════════════════════════════════
 io.on('connection', socket => {
-  const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
+  const ip = getIP(socket);
   const fp = socket.handshake.auth?.fp || '';
 
-  // Controlla ban
   if (bannatiIP.has(ip) || bannatiID.has(fp)) {
-    socket.emit('bannato');
-    socket.disconnect(true);
-    return;
+    socket.emit('bannato'); socket.disconnect(true); return;
   }
 
-  socket.anonId = 'A' + uid();
+  onlineCount++;
+  socket.anonId = 'A'+uid();
   socket.emit('connesso', { anonId: socket.anonId });
   socket.emit('battito_update', stats);
+  broadcastOnline();
 
-  // ─────────────────────────────────
-  // LANCIA SEGNALE (seeker)
-  // ─────────────────────────────────
   socket.on('lancia_segnale', ({ text, fp }) => {
     resetStats();
     if (bannatiIP.has(ip) || bannatiID.has(fp)) { socket.emit('bannato'); socket.disconnect(true); return; }
@@ -142,119 +115,96 @@ io.on('connection', socket => {
       bannatiIP.add(ip); if (fp) bannatiID.add(fp);
       socket.emit('bannato'); socket.disconnect(true); return;
     }
-
-    const id = uid() + uid();
-    const segnale = { id, text: text.trim().slice(0, 300), time: Date.now(), seekerSocketId: socket.id, taken: false };
-    segnali.set(id, segnale);
-
-    // Crea la room e il seeker entra subito
-    rooms.set(id, { seekerSocketId: socket.id, listenerSocketId: null, closedBy: new Set() });
+    const id = uid()+uid();
+    const s = { id, text:text.trim().slice(0,300), time:Date.now(), seekerSocketId:socket.id, taken:false };
+    segnali.set(id, s);
+    rooms.set(id, { seekerSocketId:socket.id, listenerSocketId:null, closedBy:new Set() });
     socket.join(id);
     socket.currentRoom = id;
     socket.ruolo = 'seeker';
-
     stats.aiutoChiesto++;
-    io.emit('nuovo_segnale', segnale);
+    io.emit('nuovo_segnale', s);
     io.emit('battito_update', stats);
-
-    // Conferma al seeker con l'id della sua room
     socket.emit('segnale_lanciato', { segnaleId: id });
   });
 
-  // ─────────────────────────────────
-  // ENTRA COME ASCOLTATORE
-  // ─────────────────────────────────
+  socket.on('sono_disponibile', () => {
+    ascDisponibili.set(socket.id, { anonId: socket.anonId, since: Date.now() });
+    socket.isDisponibile = true;
+    broadcastOnline();
+    socket.emit('disponibilita_confermata');
+  });
+
+  socket.on('non_disponibile', () => {
+    ascDisponibili.delete(socket.id);
+    socket.isDisponibile = false;
+    broadcastOnline();
+  });
+
   socket.on('entra_chat', ({ segnaleId }) => {
     resetStats();
-    const segnale = segnali.get(segnaleId);
-
-    // Segnale non esiste o già preso
-    if (!segnale || segnale.taken) {
-      socket.emit('segnale_non_disponibile');
-      return;
-    }
-
-    // Segna come preso → sparisce dal feed per tutti
-    segnale.taken = true;
+    const seg = segnali.get(segnaleId);
+    if (!seg || seg.taken) { socket.emit('segnale_non_disponibile'); return; }
+    seg.taken = true;
     io.emit('segnale_rimosso', segnaleId);
-
-    // Entra nella room
     let room = rooms.get(segnaleId);
     if (!room) {
-      room = { seekerSocketId: segnale.seekerSocketId, listenerSocketId: null, closedBy: new Set() };
+      room = { seekerSocketId: seg.seekerSocketId, listenerSocketId:null, closedBy:new Set() };
       rooms.set(segnaleId, room);
-      // Il seeker potrebbe essersi disconnesso nel frattempo
-      // ma la room esiste comunque per ricevere messaggi
     }
     room.listenerSocketId = socket.id;
     socket.join(segnaleId);
     socket.currentRoom = segnaleId;
     socket.ruolo = 'ascoltatore';
-
+    ascDisponibili.delete(socket.id);
+    socket.isDisponibile = false;
     stats.aiutoDato++;
     io.emit('battito_update', stats);
-
-    // Notifica l'ascoltatore
-    socket.emit('chat_pronta', { ruolo: 'ascoltatore' });
-
-    // Notifica il seeker che qualcuno è arrivato
-    const seekerSocket = getSocket(room.seekerSocketId);
-    if (seekerSocket) {
-      seekerSocket.emit('ascoltatore_arrivato', { segnaleId });
-    }
-
-    // Messaggio di sistema a tutta la room
-    io.to(segnaleId).emit('msg_sistema', { text: 'La connessione è stabilita. La chat è aperta. 🌿' });
+    broadcastOnline();
+    socket.emit('chat_pronta', { ruolo:'ascoltatore' });
+    const sk = getSocket(room.seekerSocketId);
+    if (sk) sk.emit('ascoltatore_arrivato', { segnaleId });
+    io.to(segnaleId).emit('msg_sistema', { text:'La connessione è stabilita. La chat è aperta. 🌿' });
   });
 
-  // ─────────────────────────────────
-  // MESSAGGIO
-  // ─────────────────────────────────
+  socket.on('typing_start', ({ segnaleId }) => {
+    socket.to(segnaleId).emit('partner_typing', { typing:true });
+  });
+  socket.on('typing_stop', ({ segnaleId }) => {
+    socket.to(segnaleId).emit('partner_typing', { typing:false });
+  });
+
   socket.on('messaggio', ({ segnaleId, text, fp }) => {
     if (bannatiIP.has(ip) || bannatiID.has(fp)) { socket.emit('bannato'); socket.disconnect(true); return; }
     if (!text || !text.trim()) return;
-
     if (isTossico(text)) {
       bannatiIP.add(ip); if (fp) bannatiID.add(fp);
       io.to(segnaleId).emit('msg_bloccato');
       socket.emit('bannato'); socket.disconnect(true); return;
     }
-
+    socket.to(segnaleId).emit('partner_typing', { typing:false });
     io.to(segnaleId).emit('messaggio', {
-      id: uid(),
-      text: text.trim().slice(0, 500),
-      anonId: socket.anonId,
-      ruolo: socket.ruolo,
-      time: Date.now()
+      id:uid(), text:text.trim().slice(0,500),
+      anonId:socket.anonId, ruolo:socket.ruolo, time:Date.now()
     });
   });
 
-  // ─────────────────────────────────
-  // ADDIO GENTILE
-  // ─────────────────────────────────
   socket.on('addio_gentile', ({ segnaleId }) => {
     const ADDIO = "Hey, purtroppo devo andare. Spero che un'altra anima ti presti ascolto. 🌿";
-
     io.to(segnaleId).emit('messaggio', {
-      id: uid(), text: ADDIO,
-      anonId: socket.anonId, ruolo: socket.ruolo,
-      time: Date.now(), isAddio: true
+      id:uid(), text:ADDIO, anonId:socket.anonId,
+      ruolo:socket.ruolo, time:Date.now(), isAddio:true
     });
-
     const room = rooms.get(segnaleId);
     if (room) {
       room.closedBy.add(socket.id);
-      io.to(segnaleId).emit('addio_ricevuto', { da: socket.ruolo });
-
-      // Chiedi l'eco al seeker
-      const seekerSocket = getSocket(room.seekerSocketId);
-      if (seekerSocket) seekerSocket.emit('chiedi_eco');
-
-      // Disintegrazione dopo 8 secondi
+      io.to(segnaleId).emit('addio_ricevuto', { da:socket.ruolo });
+      const sk = getSocket(room.seekerSocketId);
+      if (sk) sk.emit('chiedi_eco');
       setTimeout(() => {
         resetStats();
         stats.chatsCompletate++;
-        io.to(segnaleId).emit('chat_disintegrata', { stats: { ...stats } });
+        io.to(segnaleId).emit('chat_disintegrata', { stats:{ ...stats } });
         io.emit('battito_update', stats);
         rooms.delete(segnaleId);
         segnali.delete(segnaleId);
@@ -262,40 +212,32 @@ io.on('connection', socket => {
     }
   });
 
-  // ─────────────────────────────────
-  // ECO WORD
-  // ─────────────────────────────────
   socket.on('invia_eco', ({ word }) => {
     if (!word || typeof word !== 'string') return;
-    const clean = word.trim().replace(/[^a-zA-ZÀ-ÿ\s]/g, '').slice(0, 20);
+    const clean = word.trim().replace(/[^a-zA-ZÀ-ÿ\s]/g,'').slice(0,20);
     if (!clean || isTossico(clean)) return;
-    const eco = { id: uid(), word: clean, time: Date.now() };
+    const eco = { id:uid(), word:clean, time:Date.now() };
     ecoWords.push(eco);
     if (ecoWords.length > 500) ecoWords = ecoWords.slice(-500);
     io.emit('nuova_eco', eco);
   });
 
-  // ─────────────────────────────────
-  // DISCONNESSIONE
-  // ─────────────────────────────────
   socket.on('disconnect', () => {
+    onlineCount = Math.max(0, onlineCount-1);
+    ascDisponibili.delete(socket.id);
+    broadcastOnline();
     if (socket.currentRoom) {
       io.to(socket.currentRoom).emit('msg_sistema', {
         text: socket.ruolo === 'ascoltatore'
-          ? "L'ascoltatore si è disconnesso. Puoi aspettare un altro o chiudere."
+          ? "L'ascoltatore si è disconnesso. Puoi aspettare o chiudere con 🌿 Saluta."
           : "Chi aveva lanciato il segnale si è disconnesso."
       });
+      socket.to(socket.currentRoom).emit('partner_typing', { typing:false });
     }
   });
 });
 
-// ══════════════════════════════════════
-// START
-// ══════════════════════════════════════
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log('');
-  console.log('✅  ascolta RE — DEFINITIVO');
-  console.log(`👉  http://localhost:${PORT}`);
-  console.log('');
+  console.log(`\n✅  ascolta RE — ULTIMATE\n👉  http://localhost:${PORT}\n`);
 });
